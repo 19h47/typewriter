@@ -133,6 +133,10 @@
         margin-bottom: var(--typewriter-u2);
       }
 
+      typewriter-editor p:empty {
+        min-height: var(--typewriter-line-height);
+      }
+
       typewriter-editor p:last-child {
         margin-bottom: 0;
       }
@@ -495,6 +499,18 @@
         return text.trim().split(/\s+/).filter(Boolean).length;
       }
 
+      function stripEmptyParagraphs(html) {
+        if (!html || !html.trim()) return html;
+        const div = document.createElement("div");
+        div.innerHTML = html;
+        div.querySelectorAll("p").forEach((p) => {
+          const hasText = (p.textContent || "").trim() !== "";
+          const hasBr = p.querySelector("br");
+          if (!hasText && !hasBr) p.remove();
+        });
+        return div.innerHTML;
+      }
+
       class TypewriterEditorElement extends HTMLElement {
         #saveTimeout = null;
         #wasAtBottom = true;
@@ -529,11 +545,11 @@
         }
 
         get content() {
-          return this.innerHTML || "";
+          return stripEmptyParagraphs(this.innerHTML || "");
         }
 
         set content(html) {
-          this.innerHTML = html == null ? "" : html;
+          this.innerHTML = html == null ? "" : stripEmptyParagraphs(html);
         }
 
         #handleInput() {
