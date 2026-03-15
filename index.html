@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Typewriter</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="favicon.svg"
+      id="typewriter-favicon"
+    />
+    <style>
+      :root {
+        /* Golden ratio (φ) and derived scale */
+        --typewriter-phi: 1.618034;
+        --typewriter-u1: 1rem;
+        --typewriter-u2: calc(var(--typewriter-phi) * var(--typewriter-u1));
+        --typewriter-u3: calc(var(--typewriter-phi) * var(--typewriter-u2));
+        --typewriter-u4: calc(var(--typewriter-phi) * var(--typewriter-u3));
+        --typewriter-u5: calc(var(--typewriter-phi) * var(--typewriter-u4));
+
+        --typewriter-line-rgb: 201, 196, 184;
+        --typewriter-bg-rgb: 255, 255, 255;
+        --typewriter-text-rgb: 69, 69, 69;
+        --typewriter-text-muted-rgb: 92, 92, 92;
+        --typewriter-muted-overlay-rgb: 255, 255, 255;
+
+        --typewriter-bg: rgba(var(--typewriter-bg-rgb), 1);
+        --typewriter-text: rgba(var(--typewriter-text-rgb), 1);
+        --typewriter-text-muted: rgba(var(--typewriter-text-muted-rgb), 1);
+        --typewriter-line: rgba(var(--typewriter-line-rgb), 1);
+        --typewriter-muted-overlay: rgba(
+          var(--typewriter-muted-overlay-rgb),
+          0.2
+        );
+
+        --typewriter-font-mono:
+          "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
+          "Courier New", monospace;
+        --typewriter-font-ui:
+          system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+        /* Horizontal & vertical rhythm from φ (100/φ ≈ 61.8 ch) */
+        --typewriter-max-width: calc(100 / var(--typewriter-phi) * 1ch);
+        --typewriter-margin: var(--typewriter-u3);
+        --typewriter-footer-height: var(--typewriter-u4);
+        --typewriter-line-height: var(--typewriter-phi);
+        --typewriter-font-size: var(--typewriter-u1);
+
+        /* Focus outline (a11y) */
+        --typewriter-focus-outline: 2px solid var(--typewriter-text);
+        --typewriter-focus-outline-offset: 2px;
+      }
+
+      [data-theme="dark"] {
+        --typewriter-bg: rgb(26, 26, 26);
+        --typewriter-text: rgb(186, 186, 186);
+        --typewriter-text-muted: rgb(154, 151, 144);
+        --typewriter-line-rgb: 58, 56, 52;
+        --typewriter-line: rgba(var(--typewriter-line-rgb), 1);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+        background: var(--typewriter-bg);
+        color: var(--typewriter-text);
+        font-family: var(--typewriter-font-mono);
+        font-size: var(--typewriter-font-size);
+        line-height: var(--typewriter-line-height);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .typewriter-app {
+        height: 100vh;
+        padding: 0 var(--typewriter-margin);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      .typewriter-page {
+        width: 100%;
+        max-width: var(--typewriter-max-width);
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      typewriter-editor {
+        outline: none;
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        display: block;
+        padding-top: var(--typewriter-u3);
+        padding-bottom: var(--typewriter-u3);
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      typewriter-editor::-webkit-scrollbar {
+        display: none;
+      }
+
+      typewriter-editor:empty::before {
+        content: attr(data-placeholder);
+        color: var(--typewriter-text-muted);
+      }
+
+      typewriter-editor p {
+        margin-bottom: var(--typewriter-u2);
+      }
+
+      typewriter-editor p:last-child {
+        margin-bottom: 0;
+      }
+
+      typewriter-editor .sep {
+        text-align: center;
+        margin: var(--typewriter-u2) 0;
+        color: var(--typewriter-text-muted);
+        font-size: calc(1em / var(--typewriter-phi));
+      }
+
+      typewriter-footer {
+        flex-shrink: 0;
+        padding-top: var(--typewriter-u2);
+        padding-bottom: var(--typewriter-u2);
+        border-top: 1px solid rgba(var(--typewriter-line-rgb), 0.5);
+        background: var(--typewriter-bg);
+        font-family: var(--typewriter-font-ui);
+        font-size: calc(var(--typewriter-u1) / var(--typewriter-phi));
+        color: var(--typewriter-text-muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-transform: uppercase;
+      }
+
+      typewriter-footer .typewriter-footer__saved {
+        display: none;
+      }
+
+      typewriter-footer .typewriter-footer__saved.is-visible {
+        display: inline;
+      }
+
+      typewriter-shortcuts {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        z-index: 8;
+      }
+
+      typewriter-shortcuts .typewriter-hotzone {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: var(--typewriter-u3);
+        height: var(--typewriter-u3);
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts-panel {
+        position: fixed;
+        right: var(--typewriter-u2);
+        bottom: var(--typewriter-u2);
+        padding: var(--typewriter-u2);
+        line-height: var(--typewriter-phi);
+        z-index: 9;
+        max-width: calc(var(--typewriter-u4) * 4);
+        opacity: 0;
+        transform: translateY(
+          calc(var(--typewriter-u1) / var(--typewriter-phi))
+        );
+        pointer-events: none;
+        transition:
+          opacity 0.15s ease,
+          transform 0.15s ease;
+        border: 1px solid rgba(var(--typewriter-line-rgb), 0.5);
+        border-radius: calc(var(--typewriter-u1) / var(--typewriter-phi));
+        background: var(--typewriter-bg);
+        color: var(--typewriter-text);
+        font-family: var(--typewriter-font-ui);
+        font-size: calc(var(--typewriter-u1) / var(--typewriter-phi));
+        box-shadow: none;
+      }
+
+      typewriter-shortcuts
+        .typewriter-hotzone:hover
+        + .typewriter-shortcuts-panel,
+      typewriter-shortcuts .typewriter-shortcuts-panel:hover,
+      typewriter-shortcuts.is-open .typewriter-shortcuts-panel {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      typewriter-shortcuts .typewriter-hotzone {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      typewriter-shortcuts .typewriter-hotzone:focus-visible,
+      typewriter-theme-toggle button:focus-visible,
+      typewriter-distraction-toggle button:focus-visible {
+        outline: var(--typewriter-focus-outline);
+        outline-offset: var(--typewriter-focus-outline-offset);
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__title {
+        font-weight: 600;
+        margin-bottom: calc(var(--typewriter-u1) / var(--typewriter-phi));
+        color: var(--typewriter-text-muted);
+        font-family: var(--typewriter-font-ui);
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__table caption,
+      typewriter-shortcuts .typewriter-shortcuts__table thead th {
+        padding: 0;
+        height: 0;
+        line-height: 0;
+        overflow: hidden;
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__table td {
+        padding-top: var(--typewriter-u1);
+        padding-bottom: 0;
+        vertical-align: baseline;
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__table tr:first-child td {
+        padding-top: 0;
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__keys {
+        padding-right: var(--typewriter-u2);
+        white-space: nowrap;
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__table code {
+        font-size: calc(
+          var(--typewriter-u1) / var(--typewriter-phi) / var(--typewriter-phi)
+        );
+        padding: calc(var(--typewriter-u1) / 16)
+          calc(var(--typewriter-u1) / var(--typewriter-phi));
+        border-radius: calc(var(--typewriter-u1) / var(--typewriter-phi));
+        border: 1px solid var(--typewriter-line);
+        background: transparent;
+      }
+
+      typewriter-shortcuts .typewriter-shortcuts__table code + code {
+        margin-left: 2px;
+      }
+
+      typewriter-theme-toggle {
+        position: fixed;
+        top: var(--typewriter-u2);
+        right: calc(var(--typewriter-u2) + var(--typewriter-u3) + 6px);
+        z-index: 10;
+        width: var(--typewriter-u3);
+        height: var(--typewriter-u3);
+        display: flex;
+        opacity: 0.5;
+        transition: opacity 0.15s ease;
+      }
+
+      typewriter-theme-toggle:hover {
+        opacity: 1;
+      }
+
+      typewriter-theme-toggle button {
+        width: 100%;
+        height: 100%;
+        border: 1px solid var(--typewriter-line);
+        border-radius: calc(var(--typewriter-u1) / var(--typewriter-phi));
+        background: var(--typewriter-bg);
+        color: var(--typewriter-text);
+        cursor: pointer;
+        font-size: calc(var(--typewriter-u2) / var(--typewriter-phi));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+
+      /* Mode sans distraction : masquer le contenu, garder la bordure du footer */
+      body.typewriter-distraction-free typewriter-footer > * {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+
+      body.typewriter-distraction-free typewriter-shortcuts {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+
+      body.typewriter-distraction-free typewriter-theme-toggle {
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+
+      body.typewriter-distraction-free typewriter-theme-toggle:focus-within {
+        opacity: 1;
+      }
+
+      typewriter-distraction-toggle {
+        position: fixed;
+        top: var(--typewriter-u2);
+        right: var(--typewriter-u2);
+        z-index: 11;
+      }
+
+      typewriter-distraction-toggle button {
+        width: var(--typewriter-u3);
+        height: var(--typewriter-u3);
+        border: 1px solid var(--typewriter-line);
+        border-radius: calc(var(--typewriter-u1) / var(--typewriter-phi));
+        background: var(--typewriter-bg);
+        color: var(--typewriter-text);
+        cursor: pointer;
+        font-size: calc(var(--typewriter-u2) / var(--typewriter-phi));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.5;
+        transition: opacity 0.15s ease;
+      }
+
+      typewriter-distraction-toggle button:hover {
+        opacity: 1;
+      }
+
+      @media print {
+        @page {
+          margin: 2.5cm;
+        }
+
+        html,
+        body {
+          background: rgb(255, 255, 255);
+          color: rgb(0, 0, 0);
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        .typewriter-app {
+          height: auto;
+          min-height: auto;
+          padding: 0;
+          overflow: visible;
+        }
+
+        .typewriter-page {
+          max-width: none;
+          flex: none;
+          min-height: auto;
+        }
+
+        typewriter-editor {
+          min-height: 0;
+          flex: none;
+          overflow: visible;
+          height: auto;
+          padding-top: 0;
+          padding-bottom: 0;
+          font-size: 12pt !important;
+        }
+
+        typewriter-editor:empty::before {
+          content: none;
+        }
+
+        typewriter-footer,
+        typewriter-shortcuts,
+        typewriter-theme-toggle,
+        typewriter-distraction-toggle {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="typewriter-app">
+      <main class="typewriter-page">
+        <typewriter-editor
+          data-placeholder="Commencez à écrire…"
+          role="textbox"
+          aria-label="Zone d’écriture"
+        ></typewriter-editor>
+        <typewriter-footer aria-live="polite">
+          <span class="typewriter-footer__count js-typewriter-count"
+            >0 mot</span
+          >
+          <span
+            class="typewriter-footer__saved js-typewriter-saved"
+            aria-hidden="true"
+            >Enregistré</span
+          >
+        </typewriter-footer>
+      </main>
+    </div>
+
+    <typewriter-shortcuts>
+      <button
+        type="button"
+        class="typewriter-hotzone"
+        aria-label="Raccourcis clavier"
+        aria-expanded="false"
+        aria-haspopup="true"
+        aria-controls="typewriter-shortcuts-panel"
+      ></button>
+      <div
+        class="typewriter-shortcuts-panel"
+        id="typewriter-shortcuts-panel"
+        aria-hidden="true"
+      >
+        <div class="typewriter-shortcuts__title">Raccourcis</div>
+        <table class="typewriter-shortcuts__table">
+          <caption class="sr-only">
+            Liste des raccourcis clavier
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" class="sr-only">Raccourci</th>
+              <th scope="col" class="sr-only">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="typewriter-shortcuts__keys">
+                <code>Ctrl</code> + <code>S</code>
+              </td>
+              <td class="typewriter-shortcuts__desc">Enregistrer</td>
+            </tr>
+            <tr>
+              <td class="typewriter-shortcuts__keys">
+                <code>Ctrl</code> + <code>K</code>
+              </td>
+              <td class="typewriter-shortcuts__desc">Thème clair/sombre</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </typewriter-shortcuts>
+
+    <typewriter-theme-toggle
+      aria-label="Changer le thème"
+      title="Thème clair/sombre"
+    ></typewriter-theme-toggle>
+
+    <typewriter-distraction-toggle></typewriter-distraction-toggle>
+
+    <script>
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const $$ = (selector, root = document) =>
+        Array.from(root.querySelectorAll(selector));
+
+      const SAVE_DEBOUNCE_MS = 400;
+      const SCROLL_AT_BOTTOM_THRESHOLD = 10;
+
+      function getWordCount(text) {
+        if (!text || !text.trim()) return 0;
+        return text.trim().split(/\s+/).filter(Boolean).length;
+      }
+
+      class TypewriterEditorElement extends HTMLElement {
+        #saveTimeout = null;
+        #wasAtBottom = true;
+        #onInput = () => this.#handleInput();
+        #onPaste = e => this.#handlePaste(e);
+        #onScroll = () => this.#updateWasAtBottom();
+
+        static get observedAttributes() {
+          return ["data-placeholder"];
+        }
+
+        connectedCallback() {
+          this.contentEditable = "true";
+          this.spellcheck = true;
+          document.execCommand("defaultParagraphSeparator", false, "p");
+          this.addEventListener("input", this.#onInput);
+          this.addEventListener("paste", this.#onPaste);
+          this.addEventListener("scroll", this.#onScroll);
+        }
+
+        disconnectedCallback() {
+          this.removeEventListener("input", this.#onInput);
+          this.removeEventListener("paste", this.#onPaste);
+          this.removeEventListener("scroll", this.#onScroll);
+          if (this.#saveTimeout) clearTimeout(this.#saveTimeout);
+        }
+
+        #updateWasAtBottom() {
+          const maxScroll = this.scrollHeight - this.clientHeight;
+          this.#wasAtBottom =
+            this.scrollTop >= maxScroll - SCROLL_AT_BOTTOM_THRESHOLD;
+        }
+
+        get content() {
+          return this.innerHTML || "";
+        }
+
+        set content(html) {
+          this.innerHTML = html == null ? "" : html;
+        }
+
+        #handleInput() {
+          this.dispatchEvent(
+            new CustomEvent("typewriter-input", {
+              bubbles: true,
+              detail: {
+                text: this.innerText || "",
+                wordCount: getWordCount(this.innerText || ""),
+              },
+            }),
+          );
+          if (this.#saveTimeout) clearTimeout(this.#saveTimeout);
+          this.#saveTimeout = setTimeout(() => {
+            this.#saveTimeout = null;
+            this.dispatchEvent(
+              new CustomEvent("typewriter-save", { bubbles: true }),
+            );
+          }, SAVE_DEBOUNCE_MS);
+          if (this.#wasAtBottom) {
+            const maxScroll = this.scrollHeight - this.clientHeight;
+            this.scrollTop = maxScroll;
+            this.#wasAtBottom = true;
+          }
+        }
+
+        #handlePaste(e) {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData(
+            "text/plain",
+          );
+          document.execCommand("insertText", false, text);
+        }
+      }
+      customElements.define("typewriter-editor", TypewriterEditorElement);
+
+      class TypewriterFooterElement extends HTMLElement {
+        #countEl = null;
+        #savedEl = null;
+        #savedTimeout = null;
+
+        connectedCallback() {
+          this.#countEl = this.querySelector(".js-typewriter-count");
+          this.#savedEl = this.querySelector(".js-typewriter-saved");
+        }
+
+        disconnectedCallback() {
+          if (this.#savedTimeout) clearTimeout(this.#savedTimeout);
+        }
+
+        updateCount(wordCount) {
+          if (!this.#countEl) return;
+          this.#countEl.textContent =
+            wordCount === 1 ? "1 mot" : wordCount + " mots";
+        }
+
+        showSaved() {
+          if (!this.#savedEl) return;
+          this.#savedEl.classList.add("is-visible");
+          this.#savedEl.setAttribute("aria-hidden", "false");
+          if (this.#savedTimeout) clearTimeout(this.#savedTimeout);
+          this.#savedTimeout = setTimeout(() => {
+            this.#savedEl.classList.remove("is-visible");
+            this.#savedEl.setAttribute("aria-hidden", "true");
+          }, 1200);
+        }
+      }
+      customElements.define("typewriter-footer", TypewriterFooterElement);
+
+      class TypewriterThemeToggleElement extends HTMLElement {
+        #btn = null;
+        #icon = null;
+        #onClick = () => this.#toggle();
+
+        connectedCallback() {
+          this.#btn = document.createElement("button");
+          this.#btn.type = "button";
+          this.#btn.setAttribute(
+            "aria-label",
+            this.getAttribute("aria-label") || "Changer le thème",
+          );
+          this.#btn.title = this.getAttribute("title") || "Thème clair/sombre";
+          this.#icon = document.createElement("span");
+          this.#icon.setAttribute("aria-hidden", "true");
+          this.#btn.appendChild(this.#icon);
+          this.appendChild(this.#btn);
+          this.addEventListener("click", this.#onClick);
+        }
+
+        disconnectedCallback() {
+          this.removeEventListener("click", this.#onClick);
+        }
+
+        #toggle() {
+          const next =
+            document.documentElement.getAttribute("data-theme") === "dark"
+              ? "light"
+              : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          this.#updateIcon(next);
+          this.dispatchEvent(
+            new CustomEvent("typewriter-theme-change", {
+              bubbles: true,
+              detail: { theme: next },
+            }),
+          );
+        }
+
+        #updateIcon(theme) {
+          if (this.#icon) {
+            this.#icon.textContent = theme === "dark" ? "☀" : "☽";
+          }
+        }
+
+        setTheme(theme) {
+          document.documentElement.setAttribute("data-theme", theme);
+          this.#updateIcon(theme);
+        }
+      }
+      customElements.define(
+        "typewriter-theme-toggle",
+        TypewriterThemeToggleElement,
+      );
+
+      class TypewriterShortcutsElement extends HTMLElement {
+        #hideTimeout = null;
+
+        connectedCallback() {
+          const btn = this.querySelector(".typewriter-hotzone");
+          const panel = this.querySelector(".typewriter-shortcuts-panel");
+          if (!btn || !panel) return;
+
+          const show = () => {
+            if (this.#hideTimeout) {
+              clearTimeout(this.#hideTimeout);
+              this.#hideTimeout = null;
+            }
+            this.classList.add("is-open");
+            btn.setAttribute("aria-expanded", "true");
+            panel.setAttribute("aria-hidden", "false");
+          };
+
+          const hide = () => {
+            this.#hideTimeout = setTimeout(() => {
+              this.#hideTimeout = null;
+              this.classList.remove("is-open");
+              btn.setAttribute("aria-expanded", "false");
+              panel.setAttribute("aria-hidden", "true");
+            }, 150);
+          };
+
+          const focusIn = () => show();
+          const focusOut = e => {
+            if (!this.contains(e.relatedTarget)) hide();
+          };
+          const mouseEnter = () => show();
+          const mouseLeave = e => {
+            if (!this.contains(e.relatedTarget)) hide();
+          };
+
+          this.addEventListener("focusin", focusIn);
+          this.addEventListener("focusout", focusOut);
+          this.addEventListener("mouseenter", mouseEnter);
+          this.addEventListener("mouseleave", mouseLeave);
+        }
+      }
+      customElements.define("typewriter-shortcuts", TypewriterShortcutsElement);
+
+      class TypewriterDistractionToggleElement extends HTMLElement {
+        #btn = null;
+        #onClick = () => this.#toggle();
+        #onKeydown = e => {
+          if (
+            e.key === "Escape" &&
+            document.body.classList.contains("typewriter-distraction-free")
+          ) {
+            this.#setOff();
+          }
+        };
+
+        connectedCallback() {
+          this.#btn = document.createElement("button");
+          this.#btn.type = "button";
+          this.#btn.setAttribute("aria-label", "Sans distraction");
+          this.#btn.title = "Sans distraction";
+          this.#updateLabel(false);
+          this.#btn.addEventListener("click", this.#onClick);
+          this.appendChild(this.#btn);
+          document.addEventListener("keydown", this.#onKeydown);
+        }
+
+        disconnectedCallback() {
+          this.#btn?.removeEventListener("click", this.#onClick);
+          document.removeEventListener("keydown", this.#onKeydown);
+        }
+
+        #toggle() {
+          document.body.classList.toggle("typewriter-distraction-free");
+          const on = document.body.classList.contains(
+            "typewriter-distraction-free",
+          );
+          this.#updateLabel(on);
+          this.dispatchEvent(
+            new CustomEvent("typewriter-distraction-change", {
+              bubbles: true,
+              detail: { distractionFree: on },
+            }),
+          );
+        }
+
+        #setOff() {
+          document.body.classList.remove("typewriter-distraction-free");
+          this.#updateLabel(false);
+          this.dispatchEvent(
+            new CustomEvent("typewriter-distraction-change", {
+              bubbles: true,
+              detail: { distractionFree: false },
+            }),
+          );
+        }
+
+        setDistractionFree(on) {
+          if (on) {
+            document.body.classList.add("typewriter-distraction-free");
+          } else {
+            document.body.classList.remove("typewriter-distraction-free");
+          }
+          this.#updateLabel(!!on);
+        }
+
+        #updateLabel(isOn) {
+          if (!this.#btn) return;
+          this.#btn.setAttribute(
+            "aria-label",
+            isOn ? "Réafficher l’interface" : "Sans distraction",
+          );
+          this.#btn.title = isOn
+            ? "Réafficher l’interface"
+            : "Sans distraction";
+          this.#btn.textContent = "⊙";
+        }
+      }
+      customElements.define(
+        "typewriter-distraction-toggle",
+        TypewriterDistractionToggleElement,
+      );
+
+      const AppStore = (function () {
+        function create(options) {
+          const storageKey = options.key;
+          const getState = options.getState;
+          const onAfterSave = options.onAfterSave || function () {};
+
+          function read() {
+            try {
+              const raw = localStorage.getItem(storageKey);
+              return raw ? JSON.parse(raw) : null;
+            } catch (e) {
+              return null;
+            }
+          }
+
+          function write(snapshot) {
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(snapshot));
+            } catch (e) {}
+          }
+
+          return {
+            read,
+            save() {
+              write(getState());
+              onAfterSave();
+            },
+          };
+        }
+        return { create };
+      })();
+
+      (function () {
+        const $editor = $("typewriter-editor");
+        const $footer = $("typewriter-footer");
+        const $themeToggle = $("typewriter-theme-toggle");
+
+        const $distractionToggle = $("typewriter-distraction-toggle");
+        const store = AppStore.create({
+          key: "typewriter-store",
+          getState() {
+            return {
+              content: $editor ? $editor.content : "",
+              theme:
+                document.documentElement.getAttribute("data-theme") || "light",
+              distractionFree: document.body.classList.contains(
+                "typewriter-distraction-free",
+              ),
+            };
+          },
+          onAfterSave() {
+            if ($footer && typeof $footer.showSaved === "function") {
+              $footer.showSaved();
+            }
+          },
+        });
+
+        const saved = store.read();
+        const initialTheme = saved && saved.theme === "dark" ? "dark" : "light";
+        if ($themeToggle) $themeToggle.setTheme(initialTheme);
+
+        const $favicon = document.getElementById("typewriter-favicon");
+        function setFaviconForTheme(theme) {
+          if ($favicon) {
+            $favicon.href =
+              theme === "dark" ? "favicon-dark.svg" : "favicon.svg";
+          }
+        }
+        setFaviconForTheme(initialTheme);
+
+        if ($distractionToggle && saved && saved.distractionFree) {
+          $distractionToggle.setDistractionFree(true);
+        }
+        if ($editor && saved && saved.content != null) {
+          $editor.content = saved.content;
+          requestAnimationFrame(() => {
+            if ($editor.scrollHeight > $editor.clientHeight) {
+              $editor.scrollTop = $editor.scrollHeight - $editor.clientHeight;
+            }
+          });
+        }
+        if ($footer && $editor) {
+          $footer.updateCount(getWordCount($editor.innerText || ""));
+        }
+
+        if ($editor) {
+          $editor.addEventListener("typewriter-input", e => {
+            const detail = e.detail || {};
+            if ($footer)
+              $footer.updateCount(
+                detail.wordCount ?? getWordCount($editor.innerText || ""),
+              );
+          });
+          $editor.addEventListener("typewriter-save", () => {
+            store.save();
+          });
+        }
+
+        if ($themeToggle) {
+          $themeToggle.addEventListener("typewriter-theme-change", e => {
+            setFaviconForTheme(
+              e.detail?.theme ||
+                document.documentElement.getAttribute("data-theme") ||
+                "light",
+            );
+            store.save();
+          });
+        }
+        if ($distractionToggle) {
+          $distractionToggle.addEventListener(
+            "typewriter-distraction-change",
+            () => {
+              store.save();
+            },
+          );
+        }
+
+        document.addEventListener("keydown", e => {
+          if (e.ctrlKey && e.key === "s") {
+            e.preventDefault();
+            if ($editor) {
+              store.save();
+            }
+          }
+          if (e.ctrlKey && e.key === "k") {
+            e.preventDefault();
+            if ($themeToggle) $themeToggle.click();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
