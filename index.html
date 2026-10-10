@@ -275,7 +275,7 @@
         gap: var(--typewriter-control-gap);
       }
 
-      .typewriter-controls button {
+      .typewriter-controls :is(a, button) {
         width: var(--typewriter-control-size);
         height: var(--typewriter-control-size);
         border: 1px solid var(--typewriter-line);
@@ -283,7 +283,10 @@
         background: var(--typewriter-bg);
         color: var(--typewriter-text);
         cursor: pointer;
+        /* Buttons don't inherit the page font, links do: set it for both */
+        font-family: var(--typewriter-font-ui);
         font-size: var(--typewriter-u1);
+        text-decoration: none;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -291,14 +294,15 @@
         transition: opacity var(--typewriter-transition-1);
       }
 
-      .typewriter-controls button:hover,
-      .typewriter-controls button:focus-visible {
+      .typewriter-controls :is(a, button):hover,
+      .typewriter-controls :is(a, button):focus-visible {
         opacity: 1;
       }
 
       /* Distraction-free: hide the UI (kept out of tab order), keep the footer rule */
       typewriter-footer > *,
       typewriter-shortcuts,
+      typewriter-export,
       typewriter-theme-toggle {
         transition:
           opacity var(--typewriter-transition-2),
@@ -308,6 +312,7 @@
       :root[data-distraction-free] {
         typewriter-footer > *,
         typewriter-shortcuts,
+        typewriter-export,
         typewriter-theme-toggle {
           opacity: 0;
           visibility: hidden;
@@ -372,6 +377,7 @@
     <div class="typewriter-app">
       <main class="typewriter-page">
         <typewriter-editor
+          id="typewriter-editor"
           class="is-empty"
           aria-placeholder="Commencez à écrire…"
           role="textbox"
@@ -432,6 +438,15 @@
     </typewriter-shortcuts>
 
     <div class="typewriter-controls">
+      <typewriter-export for="typewriter-editor">
+        <a
+          href="#"
+          download="typewriter.txt"
+          aria-label="Exporter en .txt"
+          title="Exporter en .txt"
+          >⤓</a
+        >
+      </typewriter-export>
       <typewriter-theme-toggle>
         <button
           type="button"
@@ -472,6 +487,14 @@
           if (segment.isWordLike) count++;
         }
         return count;
+      }
+
+      /** Local date as YYYY-MM-DD. */
+      function getLocalDate() {
+        const date = new Date();
+        return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+          .map(n => String(n).padStart(2, "0"))
+          .join("-");
       }
 
       function getTheme() {
@@ -590,6 +613,41 @@
         }
       }
       customElements.define("typewriter-footer", TypewriterFooterElement);
+
+      /** Downloads the text of the editor referenced by `for` as a .txt file. */
+      class TypewriterExportElement extends HTMLElement {
+        #$link = null;
+        #controller = null;
+        #url = null;
+
+        connectedCallback() {
+          this.#$link = this.querySelector("a");
+          this.#controller = new AbortController();
+          const { signal } = this.#controller;
+          // The href is filled in during the click, before the download starts.
+          this.#$link.addEventListener("click", () => this.#prepare(), {
+            signal,
+          });
+        }
+
+        disconnectedCallback() {
+          this.#controller?.abort();
+          URL.revokeObjectURL(this.#url);
+        }
+
+        #prepare() {
+          const $editor = document.getElementById(this.getAttribute("for"));
+          const blob = new Blob([$editor.text], {
+            type: "text/plain;charset=utf-8",
+          });
+          // Revoked on the next export, once the previous download is done.
+          URL.revokeObjectURL(this.#url);
+          this.#url = URL.createObjectURL(blob);
+          this.#$link.href = this.#url;
+          this.#$link.download = `typewriter-${getLocalDate()}.txt`;
+        }
+      }
+      customElements.define("typewriter-export", TypewriterExportElement);
 
       class TypewriterThemeToggleElement extends HTMLElement {
         #$button = null;
