@@ -15,17 +15,6 @@
     <title>Typewriter</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <script>
-      // Applied before first paint to avoid a flash of the wrong theme.
-      try {
-        const saved = JSON.parse(localStorage.getItem("typewriter-store"));
-        const $root = document.documentElement;
-        if (saved?.theme === "light" || saved?.theme === "dark") {
-          $root.dataset.theme = saved.theme;
-        }
-        if (saved?.distractionFree) $root.dataset.distractionFree = "";
-      } catch {}
-    </script>
     <style>
       :root {
         color-scheme: light dark;
@@ -159,19 +148,15 @@
         outline: none;
       }
 
-      typewriter-editor::-webkit-scrollbar {
-        display: none;
-      }
-
       /* Absolutely positioned so the caret is not pushed after it */
-      typewriter-editor.is-empty::before {
+      typewriter-editor:state(empty)::before {
         position: absolute;
         content: attr(aria-placeholder);
         color: var(--typewriter-text-muted);
         pointer-events: none;
       }
 
-      typewriter-footer {
+      .typewriter-footer {
         flex-shrink: 0;
         padding-block: var(--typewriter-u2);
         border-top: 1px solid var(--typewriter-line-soft);
@@ -300,7 +285,7 @@
       }
 
       /* Distraction-free: hide the UI (kept out of tab order), keep the footer rule */
-      typewriter-footer > *,
+      .typewriter-footer > *,
       typewriter-shortcuts,
       typewriter-export,
       typewriter-theme-toggle {
@@ -310,7 +295,7 @@
       }
 
       :root[data-distraction-free] {
-        typewriter-footer > *,
+        .typewriter-footer > *,
         typewriter-shortcuts,
         typewriter-export,
         typewriter-theme-toggle {
@@ -361,33 +346,224 @@
           font-size: 12pt;
         }
 
-        typewriter-editor.is-empty::before {
+        typewriter-editor:state(empty)::before {
           content: none;
         }
 
-        typewriter-footer,
+        .typewriter-footer,
         typewriter-shortcuts,
         .typewriter-controls {
           display: none !important;
         }
       }
     </style>
+    <script>
+      "use strict";
+
+      // The store lives on window and is created before the first paint:
+      // the document takes its theme from it, without a flash of the wrong
+      // one. The block keeps everything else out of the global scope.
+      {
+        const STORAGE_KEY = "typewriter-store";
+        const SAVE_DEBOUNCE_MS = 400;
+
+        const $root = document.documentElement;
+        const $themeColor = document.querySelector('meta[name="theme-color"]');
+        const $favicon = document.querySelector('link[rel="icon"]');
+        const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+
+        /** Observable state: the part of @agencecinq/store used here. */
+        class Store {
+          #state;
+          #listeners = new Set();
+
+          constructor(initial) {
+            this.#state = initial;
+          }
+
+          get() {
+            return this.#state;
+          }
+
+          /** A function is called with the current state and returns the next one. */
+          set(update) {
+            const previous = this.#state;
+            const next =
+              typeof update === "function" ? update(previous) : update;
+
+            if (Object.is(next, previous)) return;
+
+            this.#state = next;
+            this.#listeners.forEach(listener => {
+              try {
+                listener(next, previous);
+              } catch (error) {
+                reportError(error);
+              }
+            });
+          }
+
+          /** Called on every change, not right away. Returns the unsubscribe function. */
+          subscribe(listener) {
+            this.#listeners.add(listener);
+
+            return () => {
+              this.#listeners.delete(listener);
+            };
+          }
+
+          /**
+           * Called right away with the selected slice, then only when it
+           * changes. Returns the unsubscribe function.
+           */
+          select(selector, listener) {
+            let value = selector(this.#state);
+
+            listener(value);
+
+            return this.subscribe(state => {
+              const next = selector(state);
+
+              if (Object.is(next, value)) return;
+
+              value = next;
+              listener(next);
+            });
+          }
+        }
+
+        /** What localStorage holds, checked: anything else falls back. */
+        function load() {
+          let saved = null;
+          try {
+            saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+          } catch {}
+          const theme = ["light", "dark"].includes(saved?.theme)
+            ? saved.theme
+            : null;
+          return {
+            text: typeof saved?.text === "string" ? saved.text : "",
+            // The theme shown, and whether it was chosen over the system one.
+            theme: theme ?? (darkQuery.matches ? "dark" : "light"),
+            themeChosen: theme !== null,
+            distractionFree: saved?.distractionFree === true,
+          };
+        }
+
+        /**
+         * The page state. Every brick reads and writes it, none knows the
+         * others. `saved` is false while a change waits for localStorage.
+         */
+        class TypewriterStore extends Store {
+          #saveTimeout = null;
+
+          constructor() {
+            super({ ...load(), saved: true });
+
+            darkQuery.addEventListener("change", ({ matches }) => {
+              this.set(state =>
+                state.themeChosen
+                  ? state
+                  : { ...state, theme: matches ? "dark" : "light" },
+              );
+            });
+
+            // Never lose the last keystrokes when the tab is closed or hidden.
+            addEventListener("pagehide", () => this.save());
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "hidden") this.save();
+            });
+
+            // Another tab saved: follow it, unless this one has changes of
+            // its own waiting to be saved.
+            addEventListener("storage", ({ key }) => {
+              if (key !== STORAGE_KEY || !this.get().saved) return;
+              this.set(state => ({ ...state, ...load() }));
+            });
+          }
+
+          setText(text) {
+            this.#change({ text });
+          }
+
+          toggleTheme() {
+            const theme = this.get().theme === "dark" ? "light" : "dark";
+            this.#change({ theme, themeChosen: true });
+          }
+
+          /** Like toggleAttribute(): `force` sets the mode instead. */
+          toggleDistractionFree(force = !this.get().distractionFree) {
+            this.#change({ distractionFree: force });
+          }
+
+          /** Writes the pending change right away. */
+          save() {
+            clearTimeout(this.#saveTimeout);
+            const { text, theme, themeChosen, distractionFree, saved } =
+              this.get();
+            if (saved) return;
+            try {
+              localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({
+                  text,
+                  theme: themeChosen ? theme : null,
+                  distractionFree,
+                }),
+              );
+            } catch {
+              return;
+            }
+            this.set(state => ({ ...state, saved: true }));
+          }
+
+          #change(patch) {
+            const state = this.get();
+            if (Object.keys(patch).every(key => state[key] === patch[key])) {
+              return;
+            }
+            this.set({ ...state, ...patch, saved: false });
+            clearTimeout(this.#saveTimeout);
+            this.#saveTimeout = setTimeout(() => this.save(), SAVE_DEBOUNCE_MS);
+          }
+        }
+
+        const store = new TypewriterStore();
+
+        // The document follows the store: CSS reads these attributes.
+        store.select(
+          state => state.theme,
+          theme => {
+            $root.dataset.theme = theme;
+            $themeColor.content = getComputedStyle($root).backgroundColor;
+            $favicon.href =
+              theme === "dark" ? "favicon-dark.svg" : "favicon.svg";
+          },
+        );
+        store.select(
+          state => state.distractionFree,
+          distractionFree => {
+            $root.toggleAttribute("data-distraction-free", distractionFree);
+          },
+        );
+
+        window.store = store;
+      }
+    </script>
   </head>
   <body>
     <div class="typewriter-app">
       <main class="typewriter-page">
         <typewriter-editor
-          id="typewriter-editor"
-          class="is-empty"
           aria-placeholder="Commencez à écrire…"
           role="textbox"
           aria-multiline="true"
           aria-label="Zone d’écriture"
         ></typewriter-editor>
-        <typewriter-footer>
-          <span class="js-typewriter-count">0 mot</span>
-          <span class="js-typewriter-saved" role="status"></span>
-        </typewriter-footer>
+        <footer class="typewriter-footer">
+          <typewriter-word-count>0 mot</typewriter-word-count>
+          <typewriter-save-status role="status"></typewriter-save-status>
+        </footer>
       </main>
     </div>
 
@@ -438,7 +614,7 @@
     </typewriter-shortcuts>
 
     <div class="typewriter-controls">
-      <typewriter-export for="typewriter-editor">
+      <typewriter-export>
         <a
           href="#"
           download="typewriter.txt"
@@ -454,7 +630,7 @@
           title="Thème clair/sombre"
         ></button>
       </typewriter-theme-toggle>
-      <typewriter-distraction-toggle>
+      <typewriter-distraction-free-toggle>
         <button
           type="button"
           aria-label="Mode sans distraction"
@@ -462,24 +638,23 @@
         >
           ⊙
         </button>
-      </typewriter-distraction-toggle>
+      </typewriter-distraction-free-toggle>
     </div>
 
     <script type="module">
-      const STORAGE_KEY = "typewriter-store";
-      const SAVE_DEBOUNCE_MS = 400;
-      const SAVED_VISIBLE_MS = 1200;
+      const { store } = window;
+
+      const SAVE_STATUS_HIDE_DELAY_MS = 1200;
       const SHORTCUTS_HIDE_DELAY_MS = 150;
       const SCROLL_AT_BOTTOM_THRESHOLD_PX = 10;
 
-      const $root = document.documentElement;
+      const { lang } = document.documentElement;
       const isMac = /mac|iphone|ipad/i.test(
         navigator.userAgentData?.platform ?? navigator.platform,
       );
-      const darkQuery = matchMedia("(prefers-color-scheme: dark)");
-      const segmenter = new Intl.Segmenter($root.lang || navigator.language, {
-        granularity: "word",
-      });
+      const segmenter = new Intl.Segmenter(lang, { granularity: "word" });
+      const pluralRules = new Intl.PluralRules(lang);
+      const numberFormat = new Intl.NumberFormat(lang);
 
       function getWordCount(text) {
         let count = 0;
@@ -497,17 +672,10 @@
           .join("-");
       }
 
-      function getTheme() {
-        return $root.dataset.theme ?? (darkQuery.matches ? "dark" : "light");
-      }
-
-      function isDistractionFree() {
-        return "distractionFree" in $root.dataset;
-      }
-
       class TypewriterEditorElement extends HTMLElement {
         #controller = null;
-        #saveTimeout = null;
+        #internals = this.attachInternals();
+        #text = "";
         #wasAtBottom = true;
 
         connectedCallback() {
@@ -515,185 +683,173 @@
           this.spellcheck = true;
           this.#controller = new AbortController();
           const { signal } = this.#controller;
-          this.addEventListener("input", () => this.#handleInput(), {
-            signal,
-          });
-          this.addEventListener("scroll", () => this.#updateWasAtBottom(), {
-            signal,
-          });
+
+          this.addEventListener(
+            "input",
+            () => {
+              this.#text = this.innerText;
+              store.setText(this.#text);
+              if (this.#wasAtBottom) this.scrollTop = this.scrollHeight;
+            },
+            { signal },
+          );
+          this.addEventListener(
+            "scroll",
+            () => {
+              const maxScroll = this.scrollHeight - this.clientHeight;
+              this.#wasAtBottom =
+                this.scrollTop >= maxScroll - SCROLL_AT_BOTTOM_THRESHOLD_PX;
+            },
+            { signal },
+          );
+
+          // select() returns the unsubscribe function: abort() calls it.
+          signal.addEventListener(
+            "abort",
+            store.select(
+              state => state.text,
+              text => {
+                // The text this editor just wrote comes back as is: only
+                // another tab rewrites the DOM.
+                if (text !== this.#text) {
+                  this.#text = text;
+                  this.textContent = text;
+                }
+                // Browsers may leave a lone <br> (read as "\n") once
+                // everything is deleted.
+                if (/^\n*$/.test(text)) this.#internals.states.add("empty");
+                else this.#internals.states.delete("empty");
+              },
+            ),
+          );
+
+          requestAnimationFrame(() => (this.scrollTop = this.scrollHeight));
         }
 
         disconnectedCallback() {
           this.#controller?.abort();
-          clearTimeout(this.#saveTimeout);
-        }
-
-        get text() {
-          return this.innerText;
-        }
-
-        set text(value) {
-          this.textContent = value ?? "";
-          this.#updateEmpty(this.textContent);
-        }
-
-        scrollToBottom() {
-          this.scrollTop = this.scrollHeight - this.clientHeight;
-        }
-
-        /** Cancels the pending debounced save and saves right away. */
-        flush() {
-          clearTimeout(this.#saveTimeout);
-          this.#saveTimeout = null;
-          this.#emitSave();
-        }
-
-        #updateWasAtBottom() {
-          const maxScroll = this.scrollHeight - this.clientHeight;
-          this.#wasAtBottom =
-            this.scrollTop >= maxScroll - SCROLL_AT_BOTTOM_THRESHOLD_PX;
-        }
-
-        #updateEmpty(text) {
-          // Browsers may leave a lone <br> (read as "\n") once everything is
-          // deleted.
-          this.classList.toggle("is-empty", /^\n*$/.test(text));
-        }
-
-        #emitSave() {
-          this.dispatchEvent(
-            new CustomEvent("typewriter-save", { bubbles: true }),
-          );
-        }
-
-        #handleInput() {
-          const text = this.text;
-          this.#updateEmpty(text);
-          this.dispatchEvent(
-            new CustomEvent("typewriter-input", {
-              bubbles: true,
-              detail: { wordCount: getWordCount(text) },
-            }),
-          );
-          clearTimeout(this.#saveTimeout);
-          this.#saveTimeout = setTimeout(() => {
-            this.#saveTimeout = null;
-            this.#emitSave();
-          }, SAVE_DEBOUNCE_MS);
-          if (this.#wasAtBottom) this.scrollToBottom();
         }
       }
       customElements.define("typewriter-editor", TypewriterEditorElement);
 
-      class TypewriterFooterElement extends HTMLElement {
-        #$count = null;
-        #$saved = null;
-        #savedTimeout = null;
+      class TypewriterWordCountElement extends HTMLElement {
+        #controller = null;
 
         connectedCallback() {
-          this.#$count = this.querySelector(".js-typewriter-count");
-          this.#$saved = this.querySelector(".js-typewriter-saved");
+          this.#controller = new AbortController();
+          const { signal } = this.#controller;
+          signal.addEventListener(
+            "abort",
+            store.select(
+              state => state.text,
+              text => {
+                const count = getWordCount(text);
+                // French: 0 and 1 are both "one" (0 mot, 1 mot, 2 mots).
+                const word =
+                  pluralRules.select(count) === "one" ? "mot" : "mots";
+                this.textContent = `${numberFormat.format(count)} ${word}`;
+              },
+            ),
+          );
         }
 
         disconnectedCallback() {
-          clearTimeout(this.#savedTimeout);
-        }
-
-        updateCount(wordCount) {
-          this.#$count.textContent =
-            wordCount === 1 ? "1 mot" : `${wordCount} mots`;
-        }
-
-        showSaved() {
-          this.#$saved.textContent = "Enregistré";
-          clearTimeout(this.#savedTimeout);
-          this.#savedTimeout = setTimeout(() => {
-            this.#$saved.textContent = "";
-          }, SAVED_VISIBLE_MS);
+          this.#controller?.abort();
         }
       }
-      customElements.define("typewriter-footer", TypewriterFooterElement);
+      customElements.define(
+        "typewriter-word-count",
+        TypewriterWordCountElement,
+      );
 
-      /** Downloads the text of the editor referenced by `for` as a .txt file. */
+      class TypewriterSaveStatusElement extends HTMLElement {
+        #controller = null;
+        #hideTimeout = null;
+
+        connectedCallback() {
+          this.#controller = new AbortController();
+          const { signal } = this.#controller;
+          signal.addEventListener(
+            "abort",
+            store.subscribe((state, previous) => {
+              if (!state.saved || previous.saved) return;
+              this.textContent = "Enregistré";
+              clearTimeout(this.#hideTimeout);
+              this.#hideTimeout = setTimeout(() => {
+                this.textContent = "";
+              }, SAVE_STATUS_HIDE_DELAY_MS);
+            }),
+          );
+        }
+
+        disconnectedCallback() {
+          this.#controller?.abort();
+          clearTimeout(this.#hideTimeout);
+        }
+      }
+      customElements.define(
+        "typewriter-save-status",
+        TypewriterSaveStatusElement,
+      );
+
+      /** Downloads the text as a dated .txt file. */
       class TypewriterExportElement extends HTMLElement {
-        #$link = null;
         #controller = null;
         #url = null;
 
         connectedCallback() {
-          this.#$link = this.querySelector("a");
+          const $link = this.querySelector("a");
           this.#controller = new AbortController();
           const { signal } = this.#controller;
           // The href is filled in during the click, before the download starts.
-          this.#$link.addEventListener("click", () => this.#prepare(), {
-            signal,
-          });
+          $link.addEventListener(
+            "click",
+            () => {
+              const blob = new Blob([store.get().text], {
+                type: "text/plain;charset=utf-8",
+              });
+              // Revoked on the next export, once the previous download is done.
+              URL.revokeObjectURL(this.#url);
+              this.#url = URL.createObjectURL(blob);
+              $link.href = this.#url;
+              $link.download = `typewriter-${getLocalDate()}.txt`;
+            },
+            { signal },
+          );
         }
 
         disconnectedCallback() {
           this.#controller?.abort();
           URL.revokeObjectURL(this.#url);
-        }
-
-        #prepare() {
-          const $editor = document.getElementById(this.getAttribute("for"));
-          const blob = new Blob([$editor.text], {
-            type: "text/plain;charset=utf-8",
-          });
-          // Revoked on the next export, once the previous download is done.
-          URL.revokeObjectURL(this.#url);
-          this.#url = URL.createObjectURL(blob);
-          this.#$link.href = this.#url;
-          this.#$link.download = `typewriter-${getLocalDate()}.txt`;
         }
       }
       customElements.define("typewriter-export", TypewriterExportElement);
 
       class TypewriterThemeToggleElement extends HTMLElement {
-        #$button = null;
         #controller = null;
 
         connectedCallback() {
-          this.#$button = this.querySelector("button");
+          const $button = this.querySelector("button");
           this.#controller = new AbortController();
           const { signal } = this.#controller;
-          this.#$button.addEventListener("click", () => this.toggle(), {
+          $button.addEventListener("click", () => store.toggleTheme(), {
             signal,
           });
-          darkQuery.addEventListener("change", () => this.#render(), {
-            signal,
-          });
-          this.#render();
+          signal.addEventListener(
+            "abort",
+            store.select(
+              state => state.theme,
+              theme => {
+                // U+FE0E forces text presentation (no emoji rendering).
+                $button.textContent = theme === "dark" ? "☀︎" : "☽︎";
+                $button.setAttribute("aria-pressed", String(theme === "dark"));
+              },
+            ),
+          );
         }
 
         disconnectedCallback() {
           this.#controller?.abort();
-        }
-
-        toggle() {
-          this.setTheme(getTheme() === "dark" ? "light" : "dark");
-          this.dispatchEvent(
-            new CustomEvent("typewriter-theme-change", {
-              bubbles: true,
-              detail: { theme: getTheme() },
-            }),
-          );
-        }
-
-        setTheme(theme) {
-          if (theme === "light" || theme === "dark") {
-            $root.dataset.theme = theme;
-          } else {
-            delete $root.dataset.theme;
-          }
-          this.#render();
-        }
-
-        #render() {
-          const isDark = getTheme() === "dark";
-          // U+FE0E forces text presentation (no emoji rendering).
-          this.#$button.textContent = isDark ? "☀︎" : "☽︎";
-          this.#$button.setAttribute("aria-pressed", String(isDark));
         }
       }
       customElements.define(
@@ -701,6 +857,39 @@
         TypewriterThemeToggleElement,
       );
 
+      class TypewriterDistractionFreeToggleElement extends HTMLElement {
+        #controller = null;
+
+        connectedCallback() {
+          const $button = this.querySelector("button");
+          this.#controller = new AbortController();
+          const { signal } = this.#controller;
+          $button.addEventListener(
+            "click",
+            () => store.toggleDistractionFree(),
+            { signal },
+          );
+          signal.addEventListener(
+            "abort",
+            store.select(
+              state => state.distractionFree,
+              distractionFree => {
+                $button.setAttribute("aria-pressed", String(distractionFree));
+              },
+            ),
+          );
+        }
+
+        disconnectedCallback() {
+          this.#controller?.abort();
+        }
+      }
+      customElements.define(
+        "typewriter-distraction-free-toggle",
+        TypewriterDistractionFreeToggleElement,
+      );
+
+      /** Lists the keyboard shortcuts, and handles them. */
       class TypewriterShortcutsElement extends HTMLElement {
         #controller = null;
         #hideTimeout = null;
@@ -714,6 +903,27 @@
 
           this.#controller = new AbortController();
           const { signal } = this.#controller;
+
+          document.addEventListener(
+            "keydown",
+            e => {
+              if (e.key === "Escape") {
+                store.toggleDistractionFree(false);
+                return;
+              }
+              const mod = isMac ? e.metaKey : e.ctrlKey;
+              if (!mod || e.altKey || e.shiftKey) return;
+              const key = e.key.toLowerCase();
+              if (key === "s") {
+                e.preventDefault();
+                store.save();
+              } else if (key === "k") {
+                e.preventDefault();
+                store.toggleTheme();
+              }
+            },
+            { signal },
+          );
 
           // Hover is a mouse-only enhancement; touch and keyboard use the
           // native popovertarget (closed by Escape or light dismiss).
@@ -744,148 +954,6 @@
         }
       }
       customElements.define("typewriter-shortcuts", TypewriterShortcutsElement);
-
-      class TypewriterDistractionToggleElement extends HTMLElement {
-        #$button = null;
-        #controller = null;
-
-        connectedCallback() {
-          this.#$button = this.querySelector("button");
-          this.#controller = new AbortController();
-          const { signal } = this.#controller;
-          this.#$button.addEventListener("click", () => this.toggle(), {
-            signal,
-          });
-          document.addEventListener(
-            "keydown",
-            e => {
-              if (e.key === "Escape" && isDistractionFree()) this.toggle();
-            },
-            { signal },
-          );
-          this.#render();
-        }
-
-        disconnectedCallback() {
-          this.#controller?.abort();
-        }
-
-        toggle() {
-          this.setDistractionFree(!isDistractionFree());
-          this.dispatchEvent(
-            new CustomEvent("typewriter-distraction-change", {
-              bubbles: true,
-              detail: { distractionFree: isDistractionFree() },
-            }),
-          );
-        }
-
-        setDistractionFree(on) {
-          $root.toggleAttribute("data-distraction-free", Boolean(on));
-          this.#render();
-        }
-
-        #render() {
-          this.#$button.setAttribute(
-            "aria-pressed",
-            String(isDistractionFree()),
-          );
-        }
-      }
-      customElements.define(
-        "typewriter-distraction-toggle",
-        TypewriterDistractionToggleElement,
-      );
-
-      function loadState() {
-        try {
-          return JSON.parse(localStorage.getItem(STORAGE_KEY));
-        } catch {
-          return null;
-        }
-      }
-
-      const $editor = document.querySelector("typewriter-editor");
-      const $footer = document.querySelector("typewriter-footer");
-      const $themeToggle = document.querySelector("typewriter-theme-toggle");
-      const $distractionToggle = document.querySelector(
-        "typewriter-distraction-toggle",
-      );
-      const $themeColor = document.querySelector('meta[name="theme-color"]');
-      const $favicon = document.querySelector('link[rel="icon"]');
-
-      function saveState() {
-        try {
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              text: $editor.text,
-              theme: $root.dataset.theme ?? null,
-              distractionFree: isDistractionFree(),
-            }),
-          );
-        } catch {
-          return;
-        }
-        $footer.showSaved();
-      }
-
-      function syncThemeMeta() {
-        $themeColor.content = getComputedStyle(document.body).backgroundColor;
-        $favicon.href =
-          getTheme() === "dark" ? "favicon-dark.svg" : "favicon.svg";
-      }
-
-      function applyState(state, { scroll = false } = {}) {
-        $themeToggle.setTheme(state?.theme);
-        $distractionToggle.setDistractionFree(state?.distractionFree);
-        $editor.text = state?.text ?? "";
-        $footer.updateCount(getWordCount($editor.text));
-        syncThemeMeta();
-        if (scroll) requestAnimationFrame(() => $editor.scrollToBottom());
-      }
-
-      applyState(loadState(), { scroll: true });
-
-      $editor.addEventListener("typewriter-input", e => {
-        $footer.updateCount(e.detail.wordCount);
-      });
-      $editor.addEventListener("typewriter-save", saveState);
-      $themeToggle.addEventListener("typewriter-theme-change", () => {
-        syncThemeMeta();
-        saveState();
-      });
-      $distractionToggle.addEventListener(
-        "typewriter-distraction-change",
-        saveState,
-      );
-      darkQuery.addEventListener("change", syncThemeMeta);
-
-      // Never lose the last keystrokes when the tab is closed or hidden.
-      addEventListener("pagehide", () => $editor.flush());
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") $editor.flush();
-      });
-
-      // Another tab wrote to the store: follow it while this one is in the
-      // background, so returning here never overwrites newer text.
-      addEventListener("storage", e => {
-        if (e.key !== STORAGE_KEY || document.hasFocus()) return;
-        applyState(loadState());
-      });
-
-      document.addEventListener("keydown", e => {
-        const mod = isMac ? e.metaKey : e.ctrlKey;
-        if (!mod || e.altKey || e.shiftKey) return;
-        const key = e.key.toLowerCase();
-        if (key === "s") {
-          e.preventDefault();
-          $editor.flush();
-        } else if (key === "k") {
-          e.preventDefault();
-          $themeToggle.toggle();
-        }
-      });
 
       if (
         "serviceWorker" in navigator &&

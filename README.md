@@ -4,11 +4,11 @@ A minimal, single-page writing app. Just you and the text—no toolbars, no acco
 
 ## Features
 
-- **Distraction-free writing** — One full-screen editor, optional “distraction-free” mode that hides the UI (footer, shortcuts, theme toggle) until you need it.
+- **Distraction-free writing** — One full-screen editor, optional “distraction-free” mode that hides the UI (footer, shortcuts, export, theme toggle) until you need it.
 - **Light / dark theme** — Follows the system until you toggle it with the button or **Ctrl+K** (**⌘K** on macOS). The favicon follows the current theme.
 - **Plain text** — The editor is `contenteditable="plaintext-only"`: pasted or dropped formatting is stripped, and only plain text is stored.
 - **Export** — Download your text as a dated `.txt` file with the ⤓ link, top right.
-- **Auto-save** — Text and preferences are saved to localStorage as you type, and flushed when the tab is hidden or closed. Open tabs stay in sync.
+- **Auto-save** — Text and preferences are saved to localStorage as you type, and flushed when the tab is hidden or closed. Open tabs stay in sync: a tab follows the others unless it has unsaved changes of its own.
 - **Keyboard shortcuts** — **Ctrl+S** / **⌘S** to save, **Ctrl+K** / **⌘K** to switch theme, **Esc** to leave distraction-free mode. Hover, click or tap the bottom-right corner to see the list.
 - **Accessible** — Focus outlines, toggle buttons with `aria-pressed`, a polite status for saves, a native popover for shortcuts. Respects `prefers-reduced-motion`.
 - **Offline** — Installable, with a network-first service worker.
@@ -30,8 +30,10 @@ Opening `index.html` directly works too, without offline support.
 
 ## Tech
 
-- Single HTML file with embedded CSS and JavaScript (ES module), plus `sw.js` and `manifest.webmanifest`.
-- Custom elements: `typewriter-editor`, `typewriter-footer`, `typewriter-export`, `typewriter-theme-toggle`, `typewriter-distraction-toggle`, `typewriter-shortcuts`.
+- Single HTML file with embedded CSS and JavaScript, plus `sw.js` and `manifest.webmanifest`.
+- One store, `window.store`, created by a classic script in `<head>` before the first paint. It holds the state (`text`, `theme`, `themeChosen`, `distractionFree`, `saved`), saves it to localStorage and sets `data-theme` and `data-distraction-free` on `<html>`.
+- Every custom element is a brick: it reads the store with `select()` and changes it through its actions (`setText`, `toggleTheme`, `toggleDistractionFree`, `save`). No brick knows another, so removing one leaves the others working.
+- Custom elements: `typewriter-editor`, `typewriter-word-count`, `typewriter-save-status`, `typewriter-export`, `typewriter-theme-toggle`, `typewriter-distraction-free-toggle`, `typewriter-shortcuts`.
 - Layout and spacing use a simple golden-ratio scale (φ). Colors use `light-dark()` and `color-mix()`. No frameworks or build tools.
 
 ## License
