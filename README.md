@@ -11,7 +11,7 @@ A minimal, single-page writing app. Just you and the text—no toolbars, no acco
 - **Auto-save** — Text and preferences are saved to localStorage as you type, and flushed when the tab is hidden or closed. Open tabs stay in sync: a tab follows the others unless it has unsaved changes of its own.
 - **Keyboard shortcuts** — **Ctrl+S** / **⌘S** to save, **Ctrl+K** / **⌘K** to switch theme, **Esc** to leave distraction-free mode. Hover, click or tap the bottom-right corner to see the list.
 - **Accessible** — Focus outlines, toggle buttons with `aria-pressed`, a polite status for the saves you ask for (autosaves are not read aloud), a native popover for shortcuts. Respects `prefers-reduced-motion`.
-- **Offline** — Installable, with a network-first service worker.
+- **Offline** — Installable. The service worker answers from its cache right away, even on a slow network, and refreshes it in the background: a new version shows on the next visit.
 - **No build step** — One `index.html`, vanilla JS, and custom elements. Open the file or serve the folder and you’re done.
 
 ## Run locally

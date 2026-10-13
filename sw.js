@@ -1,5 +1,5 @@
-// Network-first: always serve the latest version when online, fall back to
-// the cached copy offline.
+// Stale-while-revalidate: the cached copy answers right away, even on a slow
+// network or offline, and the network refreshes it for the next visit.
 const CACHE = "typewriter-v2";
 const ASSETS = [
   "./",
@@ -40,18 +40,14 @@ self.addEventListener("fetch", e => {
     return;
   }
   e.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(() =>
-        caches
-          .match(request, { ignoreSearch: true })
-          .then(cached => cached ?? Response.error()),
-      ),
+    caches
+      .match(request, { ignoreSearch: true })
+      .then(cached => cached ?? fetch(request)),
+  );
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then(cache => cache.add(request))
+      .catch(() => {}),
   );
 });
