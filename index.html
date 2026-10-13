@@ -57,6 +57,8 @@
         --typewriter-control-gap: calc(
           var(--typewriter-u0) / var(--typewriter-phi)
         );
+        /* 1/φ ≈ 0.618: icons at rest keep a 3:1 contrast in both themes */
+        --typewriter-control-opacity: calc(1 / var(--typewriter-phi));
 
         --typewriter-z-shortcuts: 1;
         --typewriter-z-controls: 2;
@@ -275,7 +277,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        opacity: 0.5;
+        opacity: var(--typewriter-control-opacity);
         transition: opacity var(--typewriter-transition-1);
       }
 
