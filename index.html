@@ -455,12 +455,14 @@
         /**
          * The page state. Every brick reads and writes it, none knows the
          * others. `saved` is false while a change waits for localStorage.
+         * `lastSave` is a new object on every save, so that two saves in a
+         * row both notify, and tells whether the user asked for it.
          */
         class TypewriterStore extends Store {
           #saveTimeout = null;
 
           constructor() {
-            super({ ...load(), saved: true });
+            super({ ...load(), saved: true, lastSave: null });
 
             darkQuery.addEventListener("change", ({ matches }) => {
               this.set(state =>
@@ -471,9 +473,9 @@
             });
 
             // Never lose the last keystrokes when the tab is closed or hidden.
-            addEventListener("pagehide", () => this.save());
+            addEventListener("pagehide", () => this.#write(false));
             document.addEventListener("visibilitychange", () => {
-              if (document.visibilityState === "hidden") this.save();
+              if (document.visibilityState === "hidden") this.#write(false);
             });
 
             // Another tab saved: follow it, unless this one has changes of
@@ -498,25 +500,35 @@
             this.#change({ distractionFree: force });
           }
 
-          /** Writes the pending change right away. */
+          /** The user asks to save: written now, confirmed even with nothing pending. */
           save() {
+            this.#write(true);
+          }
+
+          #write(manual) {
             clearTimeout(this.#saveTimeout);
             const { text, theme, themeChosen, distractionFree, saved } =
               this.get();
-            if (saved) return;
-            try {
-              localStorage.setItem(
-                STORAGE_KEY,
-                JSON.stringify({
-                  text,
-                  theme: themeChosen ? theme : null,
-                  distractionFree,
-                }),
-              );
-            } catch {
-              return;
+            if (saved && !manual) return;
+            if (!saved) {
+              try {
+                localStorage.setItem(
+                  STORAGE_KEY,
+                  JSON.stringify({
+                    text,
+                    theme: themeChosen ? theme : null,
+                    distractionFree,
+                  }),
+                );
+              } catch {
+                return;
+              }
             }
-            this.set(state => ({ ...state, saved: true }));
+            this.set(state => ({
+              ...state,
+              saved: true,
+              lastSave: { manual },
+            }));
           }
 
           #change(patch) {
@@ -526,7 +538,10 @@
             }
             this.set({ ...state, ...patch, saved: false });
             clearTimeout(this.#saveTimeout);
-            this.#saveTimeout = setTimeout(() => this.save(), SAVE_DEBOUNCE_MS);
+            this.#saveTimeout = setTimeout(
+              () => this.#write(false),
+              SAVE_DEBOUNCE_MS,
+            );
           }
         }
 
@@ -564,7 +579,10 @@
         ></typewriter-editor>
         <footer class="typewriter-footer">
           <typewriter-word-count>0 mot</typewriter-word-count>
-          <typewriter-save-status role="status"></typewriter-save-status>
+          <typewriter-save-status>
+            <span aria-hidden="true"></span>
+            <span class="sr-only" role="status"></span>
+          </typewriter-save-status>
         </footer>
       </main>
     </div>
@@ -769,16 +787,22 @@
         #hideTimeout = null;
 
         connectedCallback() {
+          const $text = this.querySelector("[aria-hidden]");
+          const $status = this.querySelector('[role="status"]');
           this.#controller = new AbortController();
           const { signal } = this.#controller;
           signal.addEventListener(
             "abort",
-            store.subscribe((state, previous) => {
-              if (!state.saved || previous.saved) return;
-              this.textContent = "Enregistré";
+            store.subscribe(({ lastSave }, previous) => {
+              if (lastSave === previous.lastSave) return;
+              $text.textContent = "Enregistré";
+              // Every pause in the typing saves: only a save the user asked
+              // for is read aloud.
+              if (lastSave.manual) $status.textContent = "Enregistré";
               clearTimeout(this.#hideTimeout);
               this.#hideTimeout = setTimeout(() => {
-                this.textContent = "";
+                $text.textContent = "";
+                $status.textContent = "";
               }, SAVE_STATUS_HIDE_DELAY_MS);
             }),
           );
