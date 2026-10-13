@@ -664,6 +664,7 @@
     <script type="module">
       const { store } = window;
 
+      const WORD_COUNT_DEBOUNCE_MS = 400;
       const SAVE_STATUS_HIDE_DELAY_MS = 1200;
       const SHORTCUTS_HIDE_DELAY_MS = 150;
       const SCROLL_AT_BOTTOM_THRESHOLD_PX = 10;
@@ -754,27 +755,36 @@
 
       class TypewriterWordCountElement extends HTMLElement {
         #controller = null;
+        #renderTimeout = null;
 
         connectedCallback() {
           this.#controller = new AbortController();
           const { signal } = this.#controller;
+          this.#render(store.get().text);
           signal.addEventListener(
             "abort",
-            store.select(
-              state => state.text,
-              text => {
-                const count = getWordCount(text);
-                // French: 0 and 1 are both "one" (0 mot, 1 mot, 2 mots).
-                const word =
-                  pluralRules.select(count) === "one" ? "mot" : "mots";
-                this.textContent = `${numberFormat.format(count)} ${word}`;
-              },
-            ),
+            store.subscribe(({ text }, previous) => {
+              if (text === previous.text) return;
+              // Counting walks the whole text: wait for a pause in the typing.
+              clearTimeout(this.#renderTimeout);
+              this.#renderTimeout = setTimeout(
+                () => this.#render(text),
+                WORD_COUNT_DEBOUNCE_MS,
+              );
+            }),
           );
         }
 
         disconnectedCallback() {
           this.#controller?.abort();
+          clearTimeout(this.#renderTimeout);
+        }
+
+        #render(text) {
+          const count = getWordCount(text);
+          // French: 0 and 1 are both "one" (0 mot, 1 mot, 2 mots).
+          const word = pluralRules.select(count) === "one" ? "mot" : "mots";
+          this.textContent = `${numberFormat.format(count)} ${word}`;
         }
       }
       customElements.define(
