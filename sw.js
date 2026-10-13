@@ -19,8 +19,12 @@ self.addEventListener("activate", e => {
     caches
       .keys()
       .then(keys =>
+        // The origin (19h47.github.io) is shared with other projects: only
+        // this app's old caches go.
         Promise.all(
-          keys.filter(key => key !== CACHE).map(key => caches.delete(key)),
+          keys
+            .filter(key => key.startsWith("typewriter-") && key !== CACHE)
+            .map(key => caches.delete(key)),
         ),
       )
       .then(() => self.clients.claim()),
