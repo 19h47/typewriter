@@ -15,104 +15,19 @@
     <title>Typewriter</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="app-style.css" />
     <style>
+      /* What Typewriter adds to app-style.css, the base shared by the small apps */
+
       :root {
-        color-scheme: light dark;
-
-        /* Golden ratio (φ) and derived scale */
-        --typewriter-phi: 1.618034;
-        --typewriter-u0: calc(var(--typewriter-u1) / var(--typewriter-phi));
-        --typewriter-u1: 1rem;
-        --typewriter-u2: calc(var(--typewriter-phi) * var(--typewriter-u1));
-        --typewriter-u3: calc(var(--typewriter-phi) * var(--typewriter-u2));
-        --typewriter-u4: calc(var(--typewriter-phi) * var(--typewriter-u3));
-
-        --typewriter-bg: light-dark(rgb(255, 255, 255), rgb(26, 26, 26));
-        --typewriter-text: light-dark(rgb(69, 69, 69), rgb(186, 186, 186));
-        --typewriter-text-muted: light-dark(
-          rgb(92, 92, 92),
-          rgb(154, 151, 144)
-        );
-        --typewriter-line: light-dark(rgb(201, 196, 184), rgb(58, 56, 52));
-        --typewriter-line-soft: color-mix(
-          in srgb,
-          var(--typewriter-line) 50%,
-          transparent
-        );
-
-        --typewriter-font-mono:
-          "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
-          "Courier New", monospace;
-        --typewriter-font-ui:
-          system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-
-        /* Horizontal & vertical rhythm from φ (100/φ ≈ 61.8 ch) */
-        --typewriter-max-width: calc(100 / var(--typewriter-phi) * 1ch);
-        --typewriter-margin: var(--typewriter-u3);
-        --typewriter-line-height: var(--typewriter-phi);
-        --typewriter-radius: var(--typewriter-u0);
-
-        /* Fixed controls, top-right corner */
-        --typewriter-control-size: var(--typewriter-u3);
-        --typewriter-control-gap: calc(
-          var(--typewriter-u0) / var(--typewriter-phi)
-        );
-        /* 1/φ ≈ 0.618: icons at rest keep a 3:1 contrast in both themes */
-        --typewriter-control-opacity: calc(1 / var(--typewriter-phi));
+        --typewriter-u4: calc(var(--app-phi) * var(--app-u3));
+        /* Horizontal rhythm from φ, around the page */
+        --typewriter-margin: var(--app-u3);
 
         --typewriter-z-shortcuts: 1;
         --typewriter-z-controls: 2;
 
-        /* Focus outline (a11y) */
-        --typewriter-focus-outline: 2px solid var(--typewriter-text);
-        --typewriter-focus-outline-offset: 2px;
-
-        --typewriter-transition-1: 0.15s;
-        --typewriter-transition-2: calc(
-          var(--typewriter-transition-1) * var(--typewriter-phi)
-        );
-      }
-
-      :root[data-theme="light"] {
-        color-scheme: light;
-      }
-
-      :root[data-theme="dark"] {
-        color-scheme: dark;
-      }
-
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-        border: 0;
-      }
-
-      html,
-      body {
-        min-height: 100%;
-        background: var(--typewriter-bg);
-        color: var(--typewriter-text);
-        font-family: var(--typewriter-font-mono);
-        font-size: var(--typewriter-u1);
-        line-height: var(--typewriter-line-height);
-        -webkit-font-smoothing: antialiased;
-      }
-
-      :focus-visible {
-        outline: var(--typewriter-focus-outline);
-        outline-offset: var(--typewriter-focus-outline-offset);
+        --typewriter-transition-2: calc(var(--app-transition-1) * var(--app-phi));
       }
 
       .typewriter-app {
@@ -126,7 +41,7 @@
 
       .typewriter-page {
         width: 100%;
-        max-width: var(--typewriter-max-width);
+        max-width: var(--app-max-width);
         flex: 1;
         min-height: 0;
         display: flex;
@@ -140,7 +55,7 @@
         min-height: 0;
         overflow: auto;
         outline: none;
-        padding-block: var(--typewriter-u3);
+        padding-block: var(--app-u3);
         white-space: pre-wrap;
         overflow-wrap: anywhere;
         scrollbar-width: none;
@@ -154,22 +69,13 @@
       typewriter-editor:state(empty)::before {
         position: absolute;
         content: attr(aria-placeholder);
-        color: var(--typewriter-text-muted);
+        color: var(--app-text-muted);
         pointer-events: none;
       }
 
-      .typewriter-footer {
+      /* Under the editor, which scrolls: the footer keeps its height */
+      .app-footer {
         flex-shrink: 0;
-        padding-block: var(--typewriter-u2);
-        border-top: 1px solid var(--typewriter-line-soft);
-        background: var(--typewriter-bg);
-        font-family: var(--typewriter-font-ui);
-        font-size: var(--typewriter-u0);
-        color: var(--typewriter-text-muted);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        text-transform: uppercase;
       }
 
       typewriter-shortcuts {
@@ -181,8 +87,8 @@
 
       .typewriter-shortcuts__hotzone {
         display: block;
-        width: var(--typewriter-u3);
-        height: var(--typewriter-u3);
+        width: var(--app-u3);
+        height: var(--app-u3);
         border: none;
         background: transparent;
         cursor: pointer;
@@ -191,23 +97,23 @@
 
       .typewriter-shortcuts__panel {
         /* Reset the UA popover centering, anchor bottom-right */
-        inset: auto var(--typewriter-u2) var(--typewriter-u2) auto;
+        inset: auto var(--app-u2) var(--app-u2) auto;
         margin: 0;
-        padding: var(--typewriter-u2);
+        padding: var(--app-u2);
         max-width: calc(var(--typewriter-u4) * 4);
-        border: 1px solid var(--typewriter-line-soft);
-        border-radius: var(--typewriter-radius);
-        background: var(--typewriter-bg);
-        color: var(--typewriter-text);
-        font-family: var(--typewriter-font-ui);
-        font-size: var(--typewriter-u0);
+        border: 1px solid var(--app-line-soft);
+        border-radius: var(--app-radius);
+        background: var(--app-bg);
+        color: var(--app-text);
+        font-family: var(--app-font-ui);
+        font-size: var(--app-u0);
         opacity: 0;
-        translate: 0 var(--typewriter-u0);
+        translate: 0 var(--app-u0);
         transition:
-          opacity var(--typewriter-transition-1),
-          translate var(--typewriter-transition-1),
-          display var(--typewriter-transition-1) allow-discrete,
-          overlay var(--typewriter-transition-1) allow-discrete;
+          opacity var(--app-transition-1),
+          translate var(--app-transition-1),
+          display var(--app-transition-1) allow-discrete,
+          overlay var(--app-transition-1) allow-discrete;
       }
 
       .typewriter-shortcuts__panel:popover-open {
@@ -216,14 +122,14 @@
 
         @starting-style {
           opacity: 0;
-          translate: 0 var(--typewriter-u0);
+          translate: 0 var(--app-u0);
         }
       }
 
       .typewriter-shortcuts__title {
         font-weight: 600;
-        margin-bottom: var(--typewriter-u0);
-        color: var(--typewriter-text-muted);
+        margin-bottom: var(--app-u0);
+        color: var(--app-text-muted);
       }
 
       .typewriter-shortcuts__table {
@@ -232,7 +138,7 @@
       }
 
       .typewriter-shortcuts__table td {
-        padding-top: var(--typewriter-u1);
+        padding-top: var(--app-u1);
         vertical-align: baseline;
       }
 
@@ -241,53 +147,25 @@
       }
 
       .typewriter-shortcuts__keys {
-        padding-right: var(--typewriter-u2);
+        padding-right: var(--app-u2);
         white-space: nowrap;
       }
 
       .typewriter-shortcuts__table kbd {
-        font-family: var(--typewriter-font-mono);
-        font-size: calc(var(--typewriter-u0) / var(--typewriter-phi));
-        padding: calc(var(--typewriter-u1) / 16) var(--typewriter-u0);
-        border-radius: var(--typewriter-radius);
-        border: 1px solid var(--typewriter-line);
+        font-family: var(--app-font-mono);
+        font-size: calc(var(--app-u0) / var(--app-phi));
+        padding: calc(var(--app-u1) / 16) var(--app-u0);
+        border-radius: var(--app-radius);
+        border: 1px solid var(--app-line);
       }
 
-      .typewriter-controls {
-        position: fixed;
-        top: var(--typewriter-u2);
-        right: var(--typewriter-u2);
+      /* Above the shortcuts */
+      .app-toolbar {
         z-index: var(--typewriter-z-controls);
-        display: flex;
-        gap: var(--typewriter-control-gap);
-      }
-
-      .typewriter-controls :is(a, button) {
-        width: var(--typewriter-control-size);
-        height: var(--typewriter-control-size);
-        border: 1px solid var(--typewriter-line);
-        border-radius: var(--typewriter-radius);
-        background: var(--typewriter-bg);
-        color: var(--typewriter-text);
-        cursor: pointer;
-        /* Buttons don't inherit the page font, links do: set it for both */
-        font-family: var(--typewriter-font-ui);
-        font-size: var(--typewriter-u1);
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: var(--typewriter-control-opacity);
-        transition: opacity var(--typewriter-transition-1);
-      }
-
-      .typewriter-controls :is(a, button):hover,
-      .typewriter-controls :is(a, button):focus-visible {
-        opacity: 1;
       }
 
       /* Distraction-free: hide the UI (kept out of tab order), keep the footer rule */
-      .typewriter-footer > *,
+      .app-footer > *,
       typewriter-shortcuts,
       typewriter-export,
       typewriter-theme-toggle {
@@ -297,7 +175,7 @@
       }
 
       :root[data-distraction-free] {
-        .typewriter-footer > *,
+        .app-footer > *,
         typewriter-shortcuts,
         typewriter-export,
         typewriter-theme-toggle {
@@ -306,21 +184,9 @@
         }
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        *,
-        ::before,
-        ::after {
-          transition-duration: 0s !important;
-        }
-      }
-
       @media print {
         @page {
           margin: 2.5cm;
-        }
-
-        :root {
-          color-scheme: light;
         }
 
         html,
@@ -352,9 +218,9 @@
           content: none;
         }
 
-        .typewriter-footer,
+        .app-footer,
         typewriter-shortcuts,
-        .typewriter-controls {
+        .app-toolbar {
           display: none !important;
         }
       }
@@ -577,7 +443,7 @@
           aria-multiline="true"
           aria-label="Zone d’écriture"
         ></typewriter-editor>
-        <footer class="typewriter-footer">
+        <footer class="app-footer">
           <typewriter-word-count>0 mot</typewriter-word-count>
           <typewriter-save-status>
             <span aria-hidden="true"></span>
@@ -633,7 +499,7 @@
       </div>
     </typewriter-shortcuts>
 
-    <div class="typewriter-controls">
+    <div class="app-toolbar">
       <typewriter-export>
         <a
           href="#"
