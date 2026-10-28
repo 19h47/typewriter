@@ -87,6 +87,8 @@
 
       .typewriter-shortcuts__hotzone {
         display: block;
+        /* The font of the page, not the one of a button */
+        font: inherit;
         width: var(--app-u3);
         height: var(--app-u3);
         border: none;
@@ -100,13 +102,14 @@
         inset: auto var(--app-u2) var(--app-u2) auto;
         margin: 0;
         padding: var(--app-u2);
-        max-width: calc(var(--typewriter-u4) * 4);
+        /* Three steps above --typewriter-u4 */
+        max-width: calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi));
         border: 1px solid var(--app-line-soft);
         border-radius: var(--app-radius);
         background: var(--app-bg);
         color: var(--app-text);
         font-family: var(--app-font-ui);
-        font-size: var(--app-u0);
+        font-size: var(--app-font-small);
         opacity: 0;
         translate: 0 var(--app-u0);
         transition:
@@ -153,8 +156,8 @@
 
       .typewriter-shortcuts__table kbd {
         font-family: var(--app-font-mono);
-        font-size: calc(var(--app-u0) / var(--app-phi));
-        padding: calc(var(--app-u1) / 16) var(--app-u0);
+        font-size: var(--app-font-small);
+        padding: calc(1em / var(--app-phi) / var(--app-phi) / var(--app-phi)) var(--app-u0);
         border-radius: var(--app-radius);
         border: 1px solid var(--app-line);
       }
