@@ -1,6 +1,6 @@
 // Stale-while-revalidate: the cached copy answers right away, even on a slow
 // network or offline, and the network refreshes it for the next visit.
-const CACHE = "typewriter-v8";
+const CACHE = "typewriter-v9";
 const ASSETS = [
   "./",
   "index.html",
