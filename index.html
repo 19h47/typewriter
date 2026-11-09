@@ -184,6 +184,16 @@
         overflow-y: auto;
       }
 
+      .typewriter-documents__title {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--app-gap-small);
+      }
+
+      .typewriter-documents__count {
+        font-weight: normal;
+      }
+
       .typewriter-documents__list {
         list-style: none;
         margin-top: var(--app-gap);
@@ -245,7 +255,7 @@
         white-space: nowrap;
       }
 
-      .typewriter-documents__date {
+      .typewriter-documents__meta {
         color: var(--app-text-muted);
       }
 
@@ -744,7 +754,10 @@
           id="typewriter-documents-panel"
           popover
         >
-          <div class="typewriter-panel__title">Textes</div>
+          <div class="typewriter-panel__title typewriter-documents__title">
+            Textes
+            <span class="typewriter-documents__count"></span>
+          </div>
           <button type="button" class="typewriter-documents__new">
             Nouveau texte
           </button>
@@ -753,7 +766,10 @@
             <li class="typewriter-documents__item">
               <button type="button" class="typewriter-documents__open">
                 <span class="typewriter-documents__name"></span>
-                <time class="typewriter-documents__date"></time>
+                <span class="typewriter-documents__meta">
+                  <time class="typewriter-documents__date"></time> ·
+                  <span class="typewriter-documents__words"></span>
+                </span>
               </button>
               <button
                 type="button"
@@ -833,6 +849,12 @@
           if (segment.isWordLike) count++;
         }
         return count;
+      }
+
+      function formatWordCount(count) {
+        // French: 0 and 1 are both "one" (0 mot, 1 mot, 2 mots).
+        const word = pluralRules.select(count) === "one" ? "mot" : "mots";
+        return `${numberFormat.format(count)} ${word}`;
       }
 
       /** Local date as YYYY-MM-DD. */
@@ -941,10 +963,7 @@
         }
 
         #render(text) {
-          const count = getWordCount(text);
-          // French: 0 and 1 are both "one" (0 mot, 1 mot, 2 mots).
-          const word = pluralRules.select(count) === "one" ? "mot" : "mots";
-          this.textContent = `${numberFormat.format(count)} ${word}`;
+          this.textContent = formatWordCount(getWordCount(text));
         }
       }
       customElements.define(
@@ -1005,6 +1024,7 @@
         connectedCallback() {
           const $panel = this.querySelector("[popover]");
           const $new = this.querySelector(".typewriter-documents__new");
+          const $count = this.querySelector(".typewriter-documents__count");
           const $list = this.querySelector(".typewriter-documents__list");
           const $template = this.querySelector("template");
           this.#controller = new AbortController();
@@ -1013,15 +1033,24 @@
           // Drawn only while open: the list follows every keystroke.
           const render = () => {
             const { texts, current } = store.get();
-            const entries = [...texts].sort(
-              ([, a], [, b]) => b.updatedAt - a.updatedAt,
-            );
+            const entries = [...texts]
+              .sort(([, a], [, b]) => b.updatedAt - a.updatedAt)
+              .map(([id, { text, updatedAt }]) => ({
+                id,
+                text,
+                updatedAt,
+                count: getWordCount(text),
+              }));
+            const total = entries.reduce((sum, { count }) => sum + count, 0);
+
+            $count.textContent = formatWordCount(total);
             $list.replaceChildren(
-              ...entries.map(([id, { text, updatedAt }]) => {
+              ...entries.map(({ id, text, updatedAt, count }) => {
                 const $item = $template.content.firstElementChild.cloneNode(true);
                 const $open = $item.querySelector(".typewriter-documents__open");
                 const $name = $item.querySelector(".typewriter-documents__name");
                 const $date = $item.querySelector(".typewriter-documents__date");
+                const $words = $item.querySelector(".typewriter-documents__words");
                 const $remove = $item.querySelector(
                   ".typewriter-documents__remove",
                 );
@@ -1032,6 +1061,7 @@
                 $name.textContent = title;
                 $date.dateTime = date.toISOString();
                 $date.textContent = dateFormat.format(date);
+                $words.textContent = formatWordCount(count);
                 if (id === current) $open.setAttribute("aria-current", "true");
                 $remove.setAttribute("aria-label", `Supprimer « ${title} »`);
                 return $item;
