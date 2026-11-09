@@ -97,9 +97,8 @@
         appearance: none;
       }
 
-      .typewriter-shortcuts__panel {
-        /* Reset the UA popover centering, anchor bottom-right */
-        inset: auto var(--app-u2) var(--app-u2) auto;
+      /* A popover panel, sliding in from --typewriter-panel-shift */
+      .typewriter-panel {
         margin: 0;
         padding: var(--app-u2);
         /* Three steps above --typewriter-u4 */
@@ -111,7 +110,7 @@
         font-family: var(--app-font-ui);
         font-size: var(--app-font-small);
         opacity: 0;
-        translate: 0 var(--app-u0);
+        translate: 0 var(--typewriter-panel-shift);
         transition:
           opacity var(--app-transition-1),
           translate var(--app-transition-1),
@@ -119,20 +118,27 @@
           overlay var(--app-transition-1) allow-discrete;
       }
 
-      .typewriter-shortcuts__panel:popover-open {
+      .typewriter-panel:popover-open {
         opacity: 1;
         translate: 0 0;
 
         @starting-style {
           opacity: 0;
-          translate: 0 var(--app-u0);
+          translate: 0 var(--typewriter-panel-shift);
         }
       }
 
-      .typewriter-shortcuts__title {
+      .typewriter-panel__title {
         font-weight: 600;
         margin-bottom: var(--app-u0);
         color: var(--app-text-muted);
+      }
+
+      /* Reset the UA popover centering, anchor bottom-right */
+      .typewriter-shortcuts__panel {
+        --typewriter-panel-shift: var(--app-u0);
+
+        inset: auto var(--app-u2) var(--app-u2) auto;
       }
 
       .typewriter-shortcuts__table {
@@ -162,6 +168,86 @@
         border: 1px solid var(--app-line);
       }
 
+      /* Under the toolbar, against its right edge, as wide as it may be */
+      .typewriter-documents__panel {
+        --typewriter-panel-top: calc(var(--app-toolbar-top) + var(--app-control-size) + var(--app-gap));
+        --typewriter-panel-shift: calc(-1 * var(--app-u0));
+
+        inset: var(--typewriter-panel-top) var(--app-u2) auto auto;
+        width: 100%;
+        max-width: min(
+          calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi)),
+          calc(100% - 2 * var(--app-u2))
+        );
+        max-height: calc(100% - var(--typewriter-panel-top) - var(--app-u2));
+        overflow-y: auto;
+      }
+
+      .typewriter-documents__list {
+        list-style: none;
+        margin-top: var(--app-gap);
+        display: grid;
+        gap: var(--app-gap-small);
+      }
+
+      .typewriter-documents__item {
+        display: flex;
+        gap: var(--app-gap-small);
+      }
+
+      .typewriter-documents__new,
+      .typewriter-documents__open,
+      .typewriter-documents__remove {
+        padding: var(--app-u0);
+        border: 1px solid transparent;
+        border-radius: var(--app-radius);
+        background: transparent;
+        color: var(--app-text-muted);
+        font: inherit;
+        text-align: start;
+        cursor: pointer;
+        transition:
+          color var(--app-transition-1),
+          background-color var(--app-transition-1);
+      }
+
+      .typewriter-documents__new {
+        width: 100%;
+        border-color: var(--app-line-soft);
+      }
+
+      .typewriter-documents__open {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+      }
+
+      :is(
+        .typewriter-documents__new,
+        .typewriter-documents__open,
+        .typewriter-documents__remove
+      ):is(:hover, :focus-visible) {
+        background: var(--app-fill);
+        color: var(--app-text);
+      }
+
+      /* The text open stands out as a pressed control does */
+      .typewriter-documents__open[aria-current="true"] {
+        border-color: var(--app-line);
+        background: var(--app-fill);
+        color: var(--app-text);
+      }
+
+      .typewriter-documents__name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .typewriter-documents__date {
+        color: var(--app-text-muted);
+      }
+
       /* Above the shortcuts */
       .app-toolbar {
         z-index: var(--typewriter-z-controls);
@@ -170,6 +256,7 @@
       /* Distraction-free: hide the UI (kept out of tab order), keep the footer rule */
       .app-footer > *,
       typewriter-shortcuts,
+      typewriter-documents,
       typewriter-export,
       typewriter-theme-toggle {
         transition:
@@ -180,6 +267,7 @@
       :root[data-distraction-free] {
         .app-footer > *,
         typewriter-shortcuts,
+        typewriter-documents,
         typewriter-export,
         typewriter-theme-toggle {
           opacity: 0;
@@ -236,6 +324,7 @@
       // one. The block keeps everything else out of the global scope.
       {
         const STORAGE_KEY = "typewriter-store";
+        const TEXT_KEY_PREFIX = "typewriter-text:";
         const SAVE_DEBOUNCE_MS = 400;
 
         const $root = document.documentElement;
@@ -303,8 +392,8 @@
           }
         }
 
-        /** What localStorage holds, checked: anything else falls back. */
-        function load() {
+        /** The preferences localStorage holds, checked: anything else falls back. */
+        function loadPreferences() {
           let saved = null;
           try {
             saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -313,25 +402,84 @@
             ? saved.theme
             : null;
           return {
-            text: typeof saved?.text === "string" ? saved.text : "",
             // The theme shown, and whether it was chosen over the system one.
             theme: theme ?? (darkQuery.matches ? "dark" : "light"),
             themeChosen: theme !== null,
             distractionFree: saved?.distractionFree === true,
+            // The text open last, in any tab.
+            current: typeof saved?.current === "string" ? saved.current : null,
           };
+        }
+
+        /** A text as localStorage holds it, checked: null for anything else. */
+        function parseText(value) {
+          let saved = null;
+          try {
+            saved = JSON.parse(value);
+          } catch {}
+          if (
+            typeof saved?.text !== "string" ||
+            !Number.isFinite(saved.updatedAt)
+          ) {
+            return null;
+          }
+          return { text: saved.text, updatedAt: saved.updatedAt };
+        }
+
+        /** Every text localStorage holds, by id. */
+        function loadTexts() {
+          const texts = new Map();
+          try {
+            for (let index = 0; index < localStorage.length; index++) {
+              const key = localStorage.key(index);
+              if (!key.startsWith(TEXT_KEY_PREFIX)) continue;
+              const text = parseText(localStorage.getItem(key));
+              if (text) texts.set(key.slice(TEXT_KEY_PREFIX.length), text);
+            }
+          } catch {}
+          return texts;
+        }
+
+        /** A blank text is not kept: nothing to find in the list. */
+        function isBlank(text) {
+          return text.trim() === "";
+        }
+
+        function createText() {
+          return { text: "", updatedAt: Date.now() };
+        }
+
+        /** Opens `current`, else the text written last, else a new blank one. */
+        function withCurrent(texts, current) {
+          if (texts.has(current)) return { texts, current };
+          const [latest] = [...texts].sort(
+            ([, a], [, b]) => b.updatedAt - a.updatedAt,
+          );
+          if (latest) return { texts, current: latest[0] };
+          const id = Date.now().toString(36);
+          return { texts: new Map(texts).set(id, createText()), current: id };
         }
 
         /**
          * The page state. Every brick reads and writes it, none knows the
-         * others. `saved` is false while a change waits for localStorage.
+         * others. `texts` holds every text by id, `current` the id of the
+         * one open. `saved` is false while a change waits for localStorage.
          * `lastSave` is a new object on every save, so that two saves in a
-         * row both notify, and tells whether the user asked for it.
+         * row both notify, and tells whether the user asked for it and the
+         * error that kept it from localStorage, if any.
          */
         class TypewriterStore extends Store {
           #saveTimeout = null;
+          #persistRequested = false;
 
           constructor() {
-            super({ ...load(), saved: true, lastSave: null });
+            const { current, ...preferences } = loadPreferences();
+            super({
+              ...preferences,
+              ...withCurrent(loadTexts(), current),
+              saved: true,
+              lastSave: null,
+            });
 
             darkQuery.addEventListener("change", ({ matches }) => {
               this.set(state =>
@@ -347,16 +495,55 @@
               if (document.visibilityState === "hidden") this.#write(false);
             });
 
-            // Another tab saved: follow it, unless this one has changes of
-            // its own waiting to be saved.
-            addEventListener("storage", ({ key }) => {
-              if (key !== STORAGE_KEY || !this.get().saved) return;
-              this.set(state => ({ ...state, ...load() }));
+            addEventListener("storage", ({ key, newValue }) => {
+              if (key === STORAGE_KEY) {
+                this.#followPreferences();
+              } else if (key?.startsWith(TEXT_KEY_PREFIX)) {
+                const id = key.slice(TEXT_KEY_PREFIX.length);
+                this.#followText(id, parseText(newValue));
+              }
             });
           }
 
           setText(text) {
-            this.#change({ text });
+            const { texts, current } = this.get();
+            const updatedAt = Date.now();
+            this.#change({
+              texts: new Map(texts).set(current, { text, updatedAt }),
+            });
+          }
+
+          /** Opens a new blank text, unless the one open is blank already. */
+          create() {
+            const { texts, current } = this.get();
+            if (isBlank(texts.get(current).text)) return;
+            this.#write(false);
+            const id = Date.now().toString(36);
+            this.#change({
+              texts: new Map(texts).set(id, createText()),
+              current: id,
+            });
+          }
+
+          open(id) {
+            const { texts, current } = this.get();
+            if (id === current || !texts.has(id)) return;
+            this.#write(false);
+            const next = new Map(texts);
+            if (isBlank(texts.get(current).text)) next.delete(current);
+            this.#change({ texts: next, current: id });
+          }
+
+          /** Removing the text open opens the one written last. */
+          remove(id) {
+            const { texts, current } = this.get();
+            if (!texts.has(id)) return;
+            try {
+              localStorage.removeItem(TEXT_KEY_PREFIX + id);
+            } catch {}
+            const next = new Map(texts);
+            next.delete(id);
+            this.#change(withCurrent(next, id === current ? null : current));
           }
 
           toggleTheme() {
@@ -374,30 +561,68 @@
             this.#write(true);
           }
 
+          // Another tab saved its preferences: follow them, unless this one
+          // has changes of its own waiting to be saved. Each tab keeps the
+          // text it has open.
+          #followPreferences() {
+            if (!this.get().saved) return;
+            const { current, ...preferences } = loadPreferences();
+            this.set(state => ({ ...state, ...preferences }));
+          }
+
+          // Another tab saved a text: follow it, unless it is the one open
+          // here with changes waiting. The one open here, removed there, is
+          // left blank.
+          #followText(id, text) {
+            const state = this.get();
+            if (id === state.current && !state.saved) return;
+            const texts = new Map(state.texts);
+            if (text) texts.set(id, text);
+            else if (id === state.current) texts.set(id, createText());
+            else texts.delete(id);
+            this.set({ ...state, texts });
+          }
+
           #write(manual) {
             clearTimeout(this.#saveTimeout);
-            const { text, theme, themeChosen, distractionFree, saved } =
+            const { texts, current, theme, themeChosen, distractionFree, saved } =
               this.get();
             if (saved && !manual) return;
             if (!saved) {
+              const { text, updatedAt } = texts.get(current);
+              const key = TEXT_KEY_PREFIX + current;
               try {
+                if (isBlank(text)) localStorage.removeItem(key);
+                else localStorage.setItem(key, JSON.stringify({ text, updatedAt }));
                 localStorage.setItem(
                   STORAGE_KEY,
                   JSON.stringify({
-                    text,
+                    current,
                     theme: themeChosen ? theme : null,
                     distractionFree,
                   }),
                 );
-              } catch {
+              } catch (error) {
+                this.set(state => ({ ...state, lastSave: { manual, error } }));
                 return;
               }
+              this.#persist();
             }
             this.set(state => ({
               ...state,
               saved: true,
-              lastSave: { manual },
+              lastSave: { manual, error: null },
             }));
+          }
+
+          /**
+           * Asks once that the browser keep the texts, rather than clear
+           * them when the device runs out of room.
+           */
+          #persist() {
+            if (this.#persistRequested) return;
+            this.#persistRequested = true;
+            navigator.storage?.persist().catch(() => {});
           }
 
           #change(patch) {
@@ -465,11 +690,11 @@
         popovertargetaction="show"
       ></button>
       <div
-        class="typewriter-shortcuts__panel"
+        class="typewriter-panel typewriter-shortcuts__panel"
         id="typewriter-shortcuts-panel"
         popover
       >
-        <div class="typewriter-shortcuts__title">Raccourcis</div>
+        <div class="typewriter-panel__title">Raccourcis</div>
         <table class="typewriter-shortcuts__table">
           <caption class="sr-only">
             Liste des raccourcis clavier
@@ -503,6 +728,43 @@
     </typewriter-shortcuts>
 
     <div class="app-toolbar">
+      <typewriter-documents>
+        <button
+          class="app-control"
+          type="button"
+          aria-label="Textes"
+          title="Textes"
+          popovertarget="typewriter-documents-panel"
+        >
+          ≡
+        </button>
+        <div
+          class="typewriter-panel typewriter-documents__panel"
+          id="typewriter-documents-panel"
+          popover
+        >
+          <div class="typewriter-panel__title">Textes</div>
+          <button type="button" class="typewriter-documents__new">
+            Nouveau texte
+          </button>
+          <ul class="typewriter-documents__list"></ul>
+          <template>
+            <li class="typewriter-documents__item">
+              <button type="button" class="typewriter-documents__open">
+                <span class="typewriter-documents__name"></span>
+                <time class="typewriter-documents__date"></time>
+              </button>
+              <button
+                type="button"
+                class="typewriter-documents__remove"
+                title="Supprimer"
+              >
+                ×
+              </button>
+            </li>
+          </template>
+        </div>
+      </typewriter-documents>
       <typewriter-export>
         <a
           class="app-control"
@@ -540,6 +802,7 @@
       const SAVE_STATUS_HIDE_DELAY_MS = 1200;
       const SHORTCUTS_HIDE_DELAY_MS = 150;
       const SCROLL_AT_BOTTOM_THRESHOLD_PX = 10;
+      const FILE_NAME_MAX_LENGTH = 60;
 
       const { lang } = document.documentElement;
       const isMac = /mac|iphone|ipad/i.test(
@@ -548,6 +811,20 @@
       const segmenter = new Intl.Segmenter(lang, { granularity: "word" });
       const pluralRules = new Intl.PluralRules(lang);
       const numberFormat = new Intl.NumberFormat(lang);
+      const dateFormat = new Intl.DateTimeFormat(lang, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+
+      /** The text open. */
+      function selectText({ texts, current }) {
+        return texts.get(current).text;
+      }
+
+      /** The first line written, empty for a blank text. */
+      function getTitle(text) {
+        return text.trim().split("\n", 1)[0].trim();
+      }
 
       function getWordCount(text) {
         let count = 0;
@@ -599,21 +876,30 @@
           // select() returns the unsubscribe function: abort() calls it.
           signal.addEventListener(
             "abort",
-            store.select(
-              state => state.text,
-              text => {
-                // The text this editor just wrote comes back as is: only
-                // another tab rewrites the DOM.
-                if (text !== this.#text) {
-                  this.#text = text;
-                  this.textContent = text;
-                }
-                // Browsers may leave a lone <br> (read as "\n") once
-                // everything is deleted.
-                if (/^\n*$/.test(text)) this.#internals.states.add("empty");
-                else this.#internals.states.delete("empty");
-              },
-            ),
+            store.select(selectText, text => {
+              // The text this editor just wrote comes back as is: only
+              // another text opened or another tab rewrites the DOM.
+              if (text !== this.#text) {
+                this.#text = text;
+                this.textContent = text;
+              }
+              // Browsers may leave a lone <br> (read as "\n") once
+              // everything is deleted.
+              if (/^\n*$/.test(text)) this.#internals.states.add("empty");
+              else this.#internals.states.delete("empty");
+            }),
+          );
+          // Another text opened: write on at its end.
+          signal.addEventListener(
+            "abort",
+            store.subscribe(({ current }, previous) => {
+              if (current === previous.current) return;
+              this.#wasAtBottom = true;
+              this.scrollTop = this.scrollHeight;
+              this.focus();
+              getSelection().selectAllChildren(this);
+              getSelection().collapseToEnd();
+            }),
           );
 
           requestAnimationFrame(() => (this.scrollTop = this.scrollHeight));
@@ -632,11 +918,12 @@
         connectedCallback() {
           this.#controller = new AbortController();
           const { signal } = this.#controller;
-          this.#render(store.get().text);
+          this.#render(selectText(store.get()));
           signal.addEventListener(
             "abort",
-            store.subscribe(({ text }, previous) => {
-              if (text === previous.text) return;
+            store.subscribe((state, previous) => {
+              const text = selectText(state);
+              if (text === selectText(previous)) return;
               // Counting walks the whole text: wait for a pause in the typing.
               clearTimeout(this.#renderTimeout);
               this.#renderTimeout = setTimeout(
@@ -677,11 +964,21 @@
             "abort",
             store.subscribe(({ lastSave }, previous) => {
               if (lastSave === previous.lastSave) return;
+              clearTimeout(this.#hideTimeout);
+              // A failure stays, and is read aloud, until a save goes through.
+              if (lastSave.error) {
+                const message =
+                  lastSave.error.name === "QuotaExceededError"
+                    ? "Non enregistré : stockage plein"
+                    : "Non enregistré";
+                $text.textContent = message;
+                $status.textContent = message;
+                return;
+              }
               $text.textContent = "Enregistré";
               // Every pause in the typing saves: only a save the user asked
               // for is read aloud.
-              if (lastSave.manual) $status.textContent = "Enregistré";
-              clearTimeout(this.#hideTimeout);
+              $status.textContent = lastSave.manual ? "Enregistré" : "";
               this.#hideTimeout = setTimeout(() => {
                 $text.textContent = "";
                 $status.textContent = "";
@@ -700,7 +997,116 @@
         TypewriterSaveStatusElement,
       );
 
-      /** Downloads the text as a dated .txt file. */
+      /** Lists the texts, the one written last first: opens, creates and removes them. */
+      class TypewriterDocumentsElement extends HTMLElement {
+        #controller = null;
+
+        connectedCallback() {
+          const $panel = this.querySelector("[popover]");
+          const $new = this.querySelector(".typewriter-documents__new");
+          const $list = this.querySelector(".typewriter-documents__list");
+          const $template = this.querySelector("template");
+          this.#controller = new AbortController();
+          const { signal } = this.#controller;
+
+          // Drawn only while open: the list follows every keystroke.
+          const render = () => {
+            const { texts, current } = store.get();
+            const entries = [...texts].sort(
+              ([, a], [, b]) => b.updatedAt - a.updatedAt,
+            );
+            $list.replaceChildren(
+              ...entries.map(([id, { text, updatedAt }]) => {
+                const $item = $template.content.firstElementChild.cloneNode(true);
+                const $open = $item.querySelector(".typewriter-documents__open");
+                const $name = $item.querySelector(".typewriter-documents__name");
+                const $date = $item.querySelector(".typewriter-documents__date");
+                const $remove = $item.querySelector(
+                  ".typewriter-documents__remove",
+                );
+                const title = getTitle(text) || "Sans titre";
+                const date = new Date(updatedAt);
+
+                $item.dataset.id = id;
+                $name.textContent = title;
+                $date.dateTime = date.toISOString();
+                $date.textContent = dateFormat.format(date);
+                if (id === current) $open.setAttribute("aria-current", "true");
+                $remove.setAttribute("aria-label", `Supprimer « ${title} »`);
+                return $item;
+              }),
+            );
+          };
+
+          $panel.addEventListener(
+            "beforetoggle",
+            ({ newState }) => {
+              if (newState === "open") render();
+            },
+            { signal },
+          );
+          signal.addEventListener(
+            "abort",
+            store.subscribe(({ texts, current }, previous) => {
+              if (texts === previous.texts && current === previous.current) {
+                return;
+              }
+              if ($panel.matches(":popover-open")) render();
+            }),
+          );
+
+          // Closed first: the focus it gives back to its button would
+          // otherwise take the place of the editor's.
+          $new.addEventListener(
+            "click",
+            () => {
+              $panel.hidePopover();
+              store.create();
+            },
+            { signal },
+          );
+          $list.addEventListener(
+            "click",
+            ({ target }) => {
+              const $item = target.closest("li");
+              if (!$item) return;
+              const { id } = $item.dataset;
+              if (target.closest(".typewriter-documents__open")) {
+                $panel.hidePopover();
+                store.open(id);
+              } else if (target.closest(".typewriter-documents__remove")) {
+                this.#remove($item, $panel, $new);
+              }
+            },
+            { signal },
+          );
+        }
+
+        disconnectedCallback() {
+          this.#controller?.abort();
+        }
+
+        #remove($item, $panel, $new) {
+          const { id } = $item.dataset;
+          const { texts, current } = store.get();
+          const title = getTitle(texts.get(id).text);
+          // A blank text has nothing to lose.
+          if (title && !confirm(`Supprimer « ${title} » ?`)) return;
+          if (id === current) {
+            $panel.hidePopover();
+            store.remove(id);
+            return;
+          }
+          // The focus goes to the text that takes its place in the list.
+          const index = [...$item.parentElement.children].indexOf($item);
+          store.remove(id);
+          const $items = $panel.querySelectorAll(".typewriter-documents__open");
+          ($items[Math.min(index, $items.length - 1)] ?? $new).focus();
+        }
+      }
+      customElements.define("typewriter-documents", TypewriterDocumentsElement);
+
+      /** Downloads the text open as a .txt file, named after its title and dated. */
       class TypewriterExportElement extends HTMLElement {
         #controller = null;
         #url = null;
@@ -713,14 +1119,21 @@
           $link.addEventListener(
             "click",
             () => {
-              const blob = new Blob([store.get().text], {
+              const text = selectText(store.get());
+              const blob = new Blob([text], {
                 type: "text/plain;charset=utf-8",
               });
+              // Without the characters a file name cannot hold.
+              const name =
+                getTitle(text)
+                  .replace(/[\\/:*?"<>|]/g, "")
+                  .slice(0, FILE_NAME_MAX_LENGTH)
+                  .trim() || "typewriter";
               // Revoked on the next export, once the previous download is done.
               URL.revokeObjectURL(this.#url);
               this.#url = URL.createObjectURL(blob);
               $link.href = this.#url;
-              $link.download = `typewriter-${getLocalDate()}.txt`;
+              $link.download = `${name}-${getLocalDate()}.txt`;
             },
             { signal },
           );
