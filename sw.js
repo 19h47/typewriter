@@ -1,12 +1,13 @@
 // Stale-while-revalidate: the cached copy answers right away, even on a slow
 // network or offline, and the network refreshes it for the next visit.
-const CACHE = "typewriter-v19";
+const CACHE = "typewriter-v20";
 const ASSETS = [
   "./",
   "index.html",
   "app-style.css",
   "favicon.svg",
   "favicon-dark.svg",
+  "apple-touch-icon.png",
   "manifest.webmanifest",
 ];
 

@@ -6,7 +6,7 @@ A minimal, single-page writing app. Just you and the text—no toolbars, no acco
 
 - **Distraction-free writing** — One full-screen editor, optional “distraction-free” mode that hides the UI (footer, shortcuts, texts, export, theme toggle) until you need it.
 - **Several texts** — The ≡ button, top right, lists the texts, the one written last first, titled by their first line: open one, start a new one, or remove one (after a confirmation). A blank text is not kept. The page reopens the text open last.
-- **Light / dark theme** — Follows the system until you toggle it with the button or **Ctrl+K** (**⌘K** on macOS). The favicon follows the current theme.
+- **Light / dark theme** — Follows the system until you toggle it with the button or **Ctrl+K** (**⌘K** on macOS). The favicon, the keyboard of Material Symbols grey on the background of the theme like the book of Library, follows the current theme; on the home screen of a phone, where the icon of a web app does not follow the system theme, it is the dark one.
 - **Plain text** — The editor is `contenteditable="plaintext-only"`: pasted or dropped formatting is stripped, and only plain text is stored.
 - **Export** — Download the text open as a `.txt` file, named after its first line and dated, with the ⤓ link, top right.
 - **Auto-save** — Texts and preferences are saved to localStorage as you type, and flushed when the tab is hidden or closed. Open tabs stay in sync: a tab follows the others unless it has unsaved changes of its own, and keeps the text it has open. A save that fails, such as with the storage full, says so in the footer until one goes through.
@@ -48,4 +48,4 @@ Opening `index.html` directly works too, without offline support.
 
 ## License
 
-MIT.
+MIT. The keyboard of the favicon is from [Material Symbols](https://github.com/google/material-design-icons), by Google, under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
