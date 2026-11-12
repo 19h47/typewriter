@@ -20,310 +20,312 @@
     <style>
       /* What Typewriter adds to app-style.css, the base shared by the small apps */
 
-      :root {
-        --typewriter-u4: calc(var(--app-phi) * var(--app-u3));
-        /* Horizontal rhythm from φ, around the page */
-        --typewriter-margin: var(--app-u3);
+      @layer app {
+        :root {
+          --typewriter-u4: calc(var(--app-phi) * var(--app-u3));
+          /* Horizontal rhythm from φ, around the page */
+          --typewriter-margin: var(--app-u3);
 
-        --typewriter-z-shortcuts: 1;
-        --typewriter-z-controls: 2;
+          --typewriter-z-shortcuts: 1;
+          --typewriter-z-controls: 2;
 
-        --typewriter-transition-2: calc(var(--app-transition-1) * var(--app-phi));
-      }
+          --typewriter-transition-2: calc(var(--app-transition-1) * var(--app-phi));
+        }
 
-      .typewriter-app {
-        height: 100dvh;
-        padding: 0 var(--typewriter-margin);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        overflow: hidden;
-      }
+        .typewriter-app {
+          height: 100dvh;
+          padding: 0 var(--typewriter-margin);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          overflow: hidden;
+        }
 
-      .typewriter-page {
-        width: 100%;
-        max-width: var(--app-max-width);
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-      }
+        .typewriter-page {
+          width: 100%;
+          max-width: var(--app-max-width);
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+        }
 
-      typewriter-editor {
-        position: relative;
-        display: block;
-        flex: 1;
-        min-height: 0;
-        overflow: auto;
-        outline: none;
-        padding-block: var(--app-u3);
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        scrollbar-width: none;
-      }
+        typewriter-editor {
+          position: relative;
+          display: block;
+          flex: 1;
+          min-height: 0;
+          overflow: auto;
+          outline: none;
+          padding-block: var(--app-u3);
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          scrollbar-width: none;
+        }
 
-      typewriter-editor:focus-visible {
-        outline: none;
-      }
+        typewriter-editor:focus-visible {
+          outline: none;
+        }
 
-      /* Absolutely positioned so the caret is not pushed after it */
-      typewriter-editor:state(empty)::before {
-        position: absolute;
-        content: attr(aria-placeholder);
-        color: var(--app-text-muted);
-        pointer-events: none;
-      }
+        /* Absolutely positioned so the caret is not pushed after it */
+        typewriter-editor:state(empty)::before {
+          position: absolute;
+          content: attr(aria-placeholder);
+          color: var(--app-text-muted);
+          pointer-events: none;
+        }
 
-      /* Under the editor, which scrolls: the footer keeps its height */
-      .app-footer {
-        flex-shrink: 0;
-      }
+        /* Under the editor, which scrolls: the footer keeps its height */
+        .app-footer {
+          flex-shrink: 0;
+        }
 
-      typewriter-shortcuts {
-        position: fixed;
-        right: 0;
-        bottom: 0;
-        z-index: var(--typewriter-z-shortcuts);
-      }
+        typewriter-shortcuts {
+          position: fixed;
+          right: 0;
+          bottom: 0;
+          z-index: var(--typewriter-z-shortcuts);
+        }
 
-      .typewriter-shortcuts__hotzone {
-        display: block;
-        /* The font of the page, not the one of a button */
-        font: inherit;
-        width: var(--app-u3);
-        height: var(--app-u3);
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        appearance: none;
-      }
+        .typewriter-shortcuts__hotzone {
+          display: block;
+          /* The font of the page, not the one of a button */
+          font: inherit;
+          width: var(--app-u3);
+          height: var(--app-u3);
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          appearance: none;
+        }
 
-      /* A popover panel, sliding in from --typewriter-panel-shift */
-      .typewriter-panel {
-        margin: 0;
-        padding: var(--app-u2);
-        /* Three steps above --typewriter-u4 */
-        max-width: calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi));
-        border: 1px solid var(--app-line-soft);
-        border-radius: var(--app-radius);
-        background: var(--app-bg);
-        color: var(--app-text);
-        font-family: var(--app-font-ui);
-        font-size: var(--app-font-small);
-        opacity: 0;
-        translate: 0 var(--typewriter-panel-shift);
-        transition:
-          opacity var(--app-transition-1),
-          translate var(--app-transition-1),
-          display var(--app-transition-1) allow-discrete,
-          overlay var(--app-transition-1) allow-discrete;
-      }
-
-      .typewriter-panel:popover-open {
-        opacity: 1;
-        translate: 0 0;
-
-        @starting-style {
+        /* A popover panel, sliding in from --typewriter-panel-shift */
+        .typewriter-panel {
+          margin: 0;
+          padding: var(--app-u2);
+          /* Three steps above --typewriter-u4 */
+          max-width: calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi));
+          border: 1px solid var(--app-line-soft);
+          border-radius: var(--app-radius);
+          background: var(--app-bg);
+          color: var(--app-text);
+          font-family: var(--app-font-ui);
+          font-size: var(--app-text-s);
           opacity: 0;
           translate: 0 var(--typewriter-panel-shift);
+          transition:
+            opacity var(--app-transition-1),
+            translate var(--app-transition-1),
+            display var(--app-transition-1) allow-discrete,
+            overlay var(--app-transition-1) allow-discrete;
         }
-      }
 
-      .typewriter-panel__title {
-        font-weight: 600;
-        margin-bottom: var(--app-u0);
-        color: var(--app-text-muted);
-      }
+        .typewriter-panel:popover-open {
+          opacity: 1;
+          translate: 0 0;
 
-      /* Reset the UA popover centering, anchor bottom-right */
-      .typewriter-shortcuts__panel {
-        --typewriter-panel-shift: var(--app-u0);
+          @starting-style {
+            opacity: 0;
+            translate: 0 var(--typewriter-panel-shift);
+          }
+        }
 
-        inset: auto var(--app-u2) var(--app-u2) auto;
-      }
+        .typewriter-panel__title {
+          font-weight: 600;
+          margin-bottom: var(--app-u0);
+          color: var(--app-text-muted);
+        }
 
-      .typewriter-shortcuts__table {
-        width: 100%;
-        border-collapse: collapse;
-      }
+        /* Reset the UA popover centering, anchor bottom-right */
+        .typewriter-shortcuts__panel {
+          --typewriter-panel-shift: var(--app-u0);
 
-      .typewriter-shortcuts__table td {
-        padding-top: var(--app-u1);
-        vertical-align: baseline;
-      }
+          inset: auto var(--app-u2) var(--app-u2) auto;
+        }
 
-      .typewriter-shortcuts__table tr:first-child td {
-        padding-top: 0;
-      }
+        .typewriter-shortcuts__table {
+          width: 100%;
+          border-collapse: collapse;
+        }
 
-      .typewriter-shortcuts__keys {
-        padding-right: var(--app-u2);
-        white-space: nowrap;
-      }
+        .typewriter-shortcuts__table td {
+          padding-top: var(--app-u1);
+          vertical-align: baseline;
+        }
 
-      .typewriter-shortcuts__table kbd {
-        font-family: var(--app-font-mono);
-        font-size: var(--app-font-small);
-        padding: calc(1em / var(--app-phi) / var(--app-phi) / var(--app-phi)) var(--app-u0);
-        border-radius: var(--app-radius);
-        border: 1px solid var(--app-line);
-      }
+        .typewriter-shortcuts__table tr:first-child td {
+          padding-top: 0;
+        }
 
-      /* Under the toolbar, against its right edge, as wide as it may be */
-      .typewriter-documents__panel {
-        --typewriter-panel-top: calc(var(--app-toolbar-top) + var(--app-control-size) + var(--app-gap));
-        --typewriter-panel-shift: calc(-1 * var(--app-u0));
+        .typewriter-shortcuts__keys {
+          padding-right: var(--app-u2);
+          white-space: nowrap;
+        }
 
-        inset: var(--typewriter-panel-top) var(--app-u2) auto auto;
-        width: 100%;
-        max-width: min(
-          calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi)),
-          calc(100% - 2 * var(--app-u2))
-        );
-        max-height: calc(100% - var(--typewriter-panel-top) - var(--app-u2));
-        overflow-y: auto;
-      }
+        .typewriter-shortcuts__table kbd {
+          font-family: var(--app-font-mono);
+          font-size: var(--app-text-s);
+          padding: calc(1em / var(--app-phi) / var(--app-phi) / var(--app-phi)) var(--app-u0);
+          border-radius: var(--app-radius);
+          border: 1px solid var(--app-line);
+        }
 
-      .typewriter-documents__title {
-        display: flex;
-        justify-content: space-between;
-        gap: var(--app-gap-small);
-      }
+        /* Under the toolbar, against its right edge, as wide as it may be */
+        .typewriter-documents__panel {
+          --typewriter-panel-top: calc(var(--app-toolbar-top) + var(--app-control-size) + var(--app-gap));
+          --typewriter-panel-shift: calc(-1 * var(--app-u0));
 
-      .typewriter-documents__count {
-        font-weight: normal;
-      }
+          inset: var(--typewriter-panel-top) var(--app-u2) auto auto;
+          width: 100%;
+          max-width: min(
+            calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi)),
+            calc(100% - 2 * var(--app-u2))
+          );
+          max-height: calc(100% - var(--typewriter-panel-top) - var(--app-u2));
+          overflow-y: auto;
+        }
 
-      .typewriter-documents__list {
-        list-style: none;
-        margin-top: var(--app-gap);
-        display: grid;
-        gap: var(--app-gap-small);
-      }
+        .typewriter-documents__title {
+          display: flex;
+          justify-content: space-between;
+          gap: var(--app-gap-small);
+        }
 
-      .typewriter-documents__item {
-        display: flex;
-        gap: var(--app-gap-small);
-      }
+        .typewriter-documents__count {
+          font-weight: normal;
+        }
 
-      .typewriter-documents__new,
-      .typewriter-documents__open,
-      .typewriter-documents__remove {
-        padding: var(--app-u0);
-        border: 1px solid transparent;
-        border-radius: var(--app-radius);
-        background: transparent;
-        color: var(--app-text-muted);
-        font: inherit;
-        text-align: start;
-        cursor: pointer;
-        transition:
-          color var(--app-transition-1),
-          background-color var(--app-transition-1);
-      }
+        .typewriter-documents__list {
+          list-style: none;
+          margin-top: var(--app-gap);
+          display: grid;
+          gap: var(--app-gap-small);
+        }
 
-      .typewriter-documents__new {
-        width: 100%;
-        border-color: var(--app-line-soft);
-      }
+        .typewriter-documents__item {
+          display: flex;
+          gap: var(--app-gap-small);
+        }
 
-      .typewriter-documents__open {
-        flex: 1;
-        min-width: 0;
-        display: grid;
-      }
-
-      :is(
         .typewriter-documents__new,
         .typewriter-documents__open,
-        .typewriter-documents__remove
-      ):is(:hover, :focus-visible) {
-        background: var(--app-fill);
-        color: var(--app-text);
-      }
+        .typewriter-documents__remove {
+          padding: var(--app-u0);
+          border: 1px solid transparent;
+          border-radius: var(--app-radius);
+          background: transparent;
+          color: var(--app-text-muted);
+          font: inherit;
+          text-align: start;
+          cursor: pointer;
+          transition:
+            color var(--app-transition-1),
+            background-color var(--app-transition-1);
+        }
 
-      /* The text open stands out as a pressed control does */
-      .typewriter-documents__open[aria-current="true"] {
-        border-color: var(--app-line);
-        background: var(--app-fill);
-        color: var(--app-text);
-      }
+        .typewriter-documents__new {
+          width: 100%;
+          border-color: var(--app-line-soft);
+        }
 
-      .typewriter-documents__name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+        .typewriter-documents__open {
+          flex: 1;
+          min-width: 0;
+          display: grid;
+        }
 
-      .typewriter-documents__meta {
-        color: var(--app-text-muted);
-      }
+        :is(
+          .typewriter-documents__new,
+          .typewriter-documents__open,
+          .typewriter-documents__remove
+        ):is(:hover, :focus-visible) {
+          background: var(--app-fill);
+          color: var(--app-text);
+        }
 
-      /* Above the shortcuts */
-      .app-toolbar {
-        z-index: var(--typewriter-z-controls);
-      }
+        /* The text open stands out as a pressed control does */
+        .typewriter-documents__open[aria-current="true"] {
+          border-color: var(--app-line);
+          background: var(--app-fill);
+          color: var(--app-text);
+        }
 
-      /* Distraction-free: hide the UI (kept out of tab order), keep the footer rule */
-      .app-footer > *,
-      typewriter-shortcuts,
-      typewriter-documents,
-      typewriter-export,
-      typewriter-theme-toggle {
-        transition:
-          opacity var(--typewriter-transition-2),
-          visibility var(--typewriter-transition-2);
-      }
+        .typewriter-documents__name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
 
-      :root[data-distraction-free] {
+        .typewriter-documents__meta {
+          color: var(--app-text-muted);
+        }
+
+        /* Above the shortcuts */
+        .app-toolbar {
+          z-index: var(--typewriter-z-controls);
+        }
+
+        /* Distraction-free: hide the UI (kept out of tab order), keep the footer rule */
         .app-footer > *,
         typewriter-shortcuts,
         typewriter-documents,
         typewriter-export,
         typewriter-theme-toggle {
-          opacity: 0;
-          visibility: hidden;
-        }
-      }
-
-      @media print {
-        @page {
-          margin: 2.5cm;
+          transition:
+            opacity var(--typewriter-transition-2),
+            visibility var(--typewriter-transition-2);
         }
 
-        html,
-        body {
-          background: rgb(255, 255, 255);
-          color: rgb(0, 0, 0);
-          print-color-adjust: exact;
+        :root[data-distraction-free] {
+          .app-footer > *,
+          typewriter-shortcuts,
+          typewriter-documents,
+          typewriter-export,
+          typewriter-theme-toggle {
+            opacity: 0;
+            visibility: hidden;
+          }
         }
 
-        .typewriter-app {
-          height: auto;
-          padding: 0;
-          overflow: visible;
-        }
+        @media print {
+          @page {
+            margin: 2.5cm;
+          }
 
-        .typewriter-page {
-          max-width: none;
-          flex: none;
-        }
+          html,
+          body {
+            background: rgb(255, 255, 255);
+            color: rgb(0, 0, 0);
+            print-color-adjust: exact;
+          }
 
-        typewriter-editor {
-          flex: none;
-          overflow: visible;
-          padding-block: 0;
-          font-size: 12pt;
-        }
+          .typewriter-app {
+            height: auto;
+            padding: 0;
+            overflow: visible;
+          }
 
-        typewriter-editor:state(empty)::before {
-          content: none;
-        }
+          .typewriter-page {
+            max-width: none;
+            flex: none;
+          }
 
-        .app-footer,
-        typewriter-shortcuts,
-        .app-toolbar {
-          display: none !important;
+          typewriter-editor {
+            flex: none;
+            overflow: visible;
+            padding-block: 0;
+            font-size: 12pt;
+          }
+
+          typewriter-editor:state(empty)::before {
+            content: none;
+          }
+
+          .app-footer,
+          typewriter-shortcuts,
+          .app-toolbar {
+            display: none !important;
+          }
         }
       }
     </style>
