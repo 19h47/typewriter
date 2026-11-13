@@ -24,7 +24,7 @@
         :root {
           --typewriter-u4: calc(var(--app-phi) * var(--app-u3));
           /* Horizontal rhythm from φ, around the page */
-          --typewriter-margin: var(--app-u3);
+          --typewriter-margin: var(--app-space-xl);
 
           --typewriter-z-shortcuts: 1;
           --typewriter-z-controls: 2;
@@ -57,7 +57,7 @@
           min-height: 0;
           overflow: auto;
           outline: none;
-          padding-block: var(--app-u3);
+          padding-block: var(--app-space-xl);
           white-space: pre-wrap;
           overflow-wrap: anywhere;
           scrollbar-width: none;
@@ -102,7 +102,7 @@
         /* A popover panel, sliding in from --typewriter-panel-shift */
         .typewriter-panel {
           margin: 0;
-          padding: var(--app-u2);
+          padding: var(--app-space-l);
           /* Three steps above --typewriter-u4 */
           max-width: calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi));
           border: 1px solid var(--app-line-soft);
@@ -132,7 +132,7 @@
 
         .typewriter-panel__title {
           font-weight: 600;
-          margin-bottom: var(--app-u0);
+          margin-bottom: var(--app-space-s);
           color: var(--app-text-muted);
         }
 
@@ -140,7 +140,7 @@
         .typewriter-shortcuts__panel {
           --typewriter-panel-shift: var(--app-u0);
 
-          inset: auto var(--app-u2) var(--app-u2) auto;
+          inset: auto var(--app-space-l) var(--app-space-l) auto;
         }
 
         .typewriter-shortcuts__table {
@@ -149,7 +149,7 @@
         }
 
         .typewriter-shortcuts__table td {
-          padding-top: var(--app-u1);
+          padding-top: var(--app-space-m);
           vertical-align: baseline;
         }
 
@@ -158,37 +158,37 @@
         }
 
         .typewriter-shortcuts__keys {
-          padding-right: var(--app-u2);
+          padding-right: var(--app-space-l);
           white-space: nowrap;
         }
 
         .typewriter-shortcuts__table kbd {
           font-family: var(--app-font-mono);
           font-size: var(--app-text-s);
-          padding: calc(1em / var(--app-phi) / var(--app-phi) / var(--app-phi)) var(--app-u0);
+          padding: calc(1em / var(--app-phi) / var(--app-phi) / var(--app-phi)) var(--app-space-s);
           border-radius: var(--app-radius);
           border: 1px solid var(--app-line);
         }
 
         /* Under the toolbar, against its right edge, as wide as it may be */
         .typewriter-documents__panel {
-          --typewriter-panel-top: calc(var(--app-toolbar-top) + var(--app-control-size) + var(--app-gap));
+          --typewriter-panel-top: calc(var(--app-toolbar-top) + var(--app-control-size) + var(--app-space-s));
           --typewriter-panel-shift: calc(-1 * var(--app-u0));
 
-          inset: var(--typewriter-panel-top) var(--app-u2) auto auto;
+          inset: var(--typewriter-panel-top) var(--app-space-l) auto auto;
           width: 100%;
           max-width: min(
             calc(var(--typewriter-u4) * var(--app-phi) * var(--app-phi) * var(--app-phi)),
-            calc(100% - 2 * var(--app-u2))
+            calc(100% - 2 * var(--app-space-l))
           );
-          max-height: calc(100% - var(--typewriter-panel-top) - var(--app-u2));
+          max-height: calc(100% - var(--typewriter-panel-top) - var(--app-space-l));
           overflow-y: auto;
         }
 
         .typewriter-documents__title {
           display: flex;
           justify-content: space-between;
-          gap: var(--app-gap-small);
+          gap: var(--app-space-xs);
         }
 
         .typewriter-documents__count {
@@ -197,20 +197,20 @@
 
         .typewriter-documents__list {
           list-style: none;
-          margin-top: var(--app-gap);
+          margin-top: var(--app-space-s);
           display: grid;
-          gap: var(--app-gap-small);
+          gap: var(--app-space-xs);
         }
 
         .typewriter-documents__item {
           display: flex;
-          gap: var(--app-gap-small);
+          gap: var(--app-space-xs);
         }
 
         .typewriter-documents__new,
         .typewriter-documents__open,
         .typewriter-documents__remove {
-          padding: var(--app-u0);
+          padding: var(--app-space-s);
           border: 1px solid transparent;
           border-radius: var(--app-radius);
           background: transparent;
