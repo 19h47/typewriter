@@ -288,8 +288,16 @@
         }
 
         @media print {
+          /* A step above --typewriter-u4: about 2.9cm, at 1rem = 12pt */
           @page {
-            margin: 2.5cm;
+            margin: calc(var(--typewriter-u4) * var(--app-phi));
+
+            /* Chromium only: Firefox and Safari print without it */
+            @bottom-center {
+              content: counter(page);
+              font-family: var(--app-font-mono);
+              font-size: var(--app-text-s);
+            }
           }
 
           html,
@@ -314,7 +322,6 @@
             flex: none;
             overflow: visible;
             padding-block: 0;
-            font-size: 12pt;
           }
 
           typewriter-editor:state(empty)::before {
