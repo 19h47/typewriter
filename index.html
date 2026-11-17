@@ -318,10 +318,14 @@
             flex: none;
           }
 
+          /* Cut as a printed page is: two letters at least before the hyphen, three after it */
           typewriter-editor {
             flex: none;
             overflow: visible;
             padding-block: 0;
+            hyphens: auto;
+            hyphenate-limit-chars: auto 2 3;
+            text-wrap: pretty;
           }
 
           typewriter-editor:state(empty)::before {
