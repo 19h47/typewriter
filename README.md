@@ -1,6 +1,6 @@
 # Typewriter
 
-A minimal, single-page writing app. Just you and the text—no toolbars, no accounts. Inspired by the focus of a typewriter, built for the web.
+A minimal, single-page writing app. Just you and the text—no toolbars, no accounts of its own. Inspired by the focus of a typewriter, built for the web.
 
 ## Features
 
@@ -10,6 +10,7 @@ A minimal, single-page writing app. Just you and the text—no toolbars, no acco
 - **Plain text** — The editor is `contenteditable="plaintext-only"`: pasted or dropped formatting is stripped, and only plain text is stored.
 - **Export** — Download the text open as a `.txt` file, named after its first line and dated, with the ⤓ link, top right.
 - **Print** — The text alone, in black on white, its margins and its sizes on the golden-ratio scale, hyphenated by the rules of French (two letters at least before the hyphen, three after it) with no short last line (but in Firefox), each page numbered at its foot (in Chromium browsers; Firefox and Safari print without the numbers).
+- **Sync** — The ⇅ button, top right, keeps the texts in a secret gist of your GitHub account, the same on every device given the same token: write on the Mac, add an idea on the phone. Paste a token that may write gists, a [classic token with the `gist` scope](https://github.com/settings/tokens/new?scopes=gist&description=Typewriter) or a fine-grained one with the Gists permission in Read and write; the first device makes the gist, named Typewriter, the next ones find it. Each device syncs when the page shows, after a pause of three seconds in the typing and when the page is hidden. A text changed on two devices between two syncs is kept twice, both versions in the list under the same title; a text removed on one device and changed on another is kept. Offline, the changes wait for the network. A sync that fails puts a dot on the button, and says why in its panel; a token refused disconnects the device. Disconnecting keeps the texts on the device and in the gist.
 - **Auto-save** — Texts and preferences are saved to localStorage as you type, and flushed when the tab is hidden or closed. Open tabs stay in sync: a tab follows the others unless it has unsaved changes of its own, and keeps the text it has open. A save that fails, such as with the storage full, says so in the footer until one goes through.
 - **Keyboard shortcuts** — **Ctrl+S** / **⌘S** to save, **Ctrl+K** / **⌘K** to switch theme, **Esc** to leave distraction-free mode. Hover, click or tap the bottom-right corner to see the list.
 - **Accessible** — Focus outlines, toggle buttons with `aria-pressed`, a polite status for the saves you ask for and for the ones that fail (autosaves are not read aloud), native popovers for the shortcuts and the texts, the text open marked with `aria-current`. Respects `prefers-reduced-motion`.
@@ -18,7 +19,9 @@ A minimal, single-page writing app. Just you and the text—no toolbars, no acco
 
 ## Limits
 
-localStorage holds about 5 MiB per origin, a few million characters, shared with every app served from the same origin (19h47.github.io). Safari may clear it after seven days of use without a visit, unless the app is installed on the Home Screen or in the Dock: export what matters.
+localStorage holds about 5 MiB per origin, a few million characters, shared with every app served from the same origin (19h47.github.io). Safari may clear it after seven days of use without a visit, unless the app is installed on the Home Screen or in the Dock: export what matters, or sync it.
+
+The token is kept in localStorage, which every app of 19h47.github.io can read: give it only the gists, and an expiry. GitHub allows 5,000 requests an hour to a token, a sync takes one or two. A page hidden on a phone may be stopped before its last sync ends: the next visit sends it.
 
 ## Breaking changes
 
@@ -43,8 +46,9 @@ Opening `index.html` directly works too, without offline support.
 - One HTML file with its JavaScript and the styles of its own, plus `app-style.css` for the base styles, `sw.js` and `manifest.webmanifest`. The service worker caches `app-style.css` with the page.
 - One store, `window.store`, created by a classic script in `<head>` before the first paint. It holds the state (`texts`, `current`, `theme`, `themeChosen`, `distractionFree`, `saved`, `lastSave`), saves it to localStorage and sets `data-theme` and `data-distraction-free` on `<html>`.
 - localStorage holds one key per text, `typewriter-text:<id>` (`{ text, updatedAt }`), so that a keystroke rewrites only the text open, and `typewriter-store` for the preferences and the text open last. The list of texts is the list of these keys. The first save asks the browser to keep the storage persistent (`navigator.storage.persist()`).
-- Every custom element is a brick: it reads the store with `select()` and changes it through its actions (`setText`, `create`, `open`, `remove`, `toggleTheme`, `toggleDistractionFree`, `save`). No brick knows another, so removing one leaves the others working.
-- Custom elements: `typewriter-editor`, `typewriter-word-count`, `typewriter-save-status`, `typewriter-documents`, `typewriter-export`, `typewriter-theme-toggle`, `typewriter-distraction-free-toggle`, `typewriter-shortcuts`.
+- Every custom element is a brick: it reads the store with `select()` and changes it through its actions (`setText`, `create`, `open`, `remove`, `toggleTheme`, `toggleDistractionFree`, `save`, `receive`). No brick knows another, so removing one leaves the others working.
+- Custom elements: `typewriter-editor`, `typewriter-word-count`, `typewriter-save-status`, `typewriter-documents`, `typewriter-sync`, `typewriter-export`, `typewriter-theme-toggle`, `typewriter-distraction-free-toggle`, `typewriter-shortcuts`.
+- `typewriter-sync` keeps `typewriter-sync` in localStorage: the token, the id of the gist, and `base`, the `updatedAt` of each text at the last sync. The gist holds one file per text, `<id>.json` (`{ text, updatedAt }`, as in localStorage), and a `README.md` that keeps it from being empty. A sync reads the gist, compares each text on each side with `base` to tell what changed where, sends what changed here in one `PATCH`, and hands what changed there to the store's `receive`, which takes a text only if it has not changed here meanwhile, then writes it to localStorage, where the other tabs follow it.
 - `app-style.css` is the base shared by the small apps (Tumblr, Messenger, SMS, Tweets, Typewriter, Library, Letterhead, Overlay), copied from [its gist](https://gist.github.com/19h47/27df983fac74beb8d3e0a30688654498) with the revision in its header: the toolbar (`.app-toolbar`) and the footer (`.app-footer`) come from it; `index.html` adds the editor, the shortcuts and the distraction-free mode. A golden-ratio scale (φ), colors with `light-dark()` and `color-mix()`, classes prefixed `app-`. To update it, copy a newer revision and change `CACHE` in `sw.js`. No frameworks or build tools.
 
 ## License

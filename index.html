@@ -171,7 +171,7 @@
         }
 
         /* Under the toolbar, against its right edge, as wide as it may be */
-        .typewriter-documents__panel {
+        .typewriter-panel--toolbar {
           --typewriter-panel-top: calc(var(--app-toolbar-top) + var(--app-control-size) + var(--app-space-s));
           --typewriter-panel-shift: calc(-1 * var(--app-u0));
 
@@ -207,7 +207,7 @@
           gap: var(--app-space-xs);
         }
 
-        .typewriter-documents__new,
+        .typewriter-panel__button,
         .typewriter-documents__open,
         .typewriter-documents__remove {
           padding: var(--app-space-s);
@@ -223,9 +223,12 @@
             background-color var(--app-transition-1);
         }
 
+        .typewriter-panel__button {
+          border-color: var(--app-line-soft);
+        }
+
         .typewriter-documents__new {
           width: 100%;
-          border-color: var(--app-line-soft);
         }
 
         .typewriter-documents__open {
@@ -235,7 +238,7 @@
         }
 
         :is(
-          .typewriter-documents__new,
+          .typewriter-panel__button,
           .typewriter-documents__open,
           .typewriter-documents__remove
         ):is(:hover, :focus-visible) {
@@ -260,6 +263,39 @@
           color: var(--app-text-muted);
         }
 
+        .typewriter-sync__status {
+          margin-bottom: var(--app-space-s);
+        }
+
+        .typewriter-sync__status:empty {
+          display: none;
+        }
+
+        .typewriter-sync__part,
+        .typewriter-sync__field {
+          display: grid;
+          gap: var(--app-space-s);
+        }
+
+        .typewriter-sync__field {
+          gap: var(--app-space-xs);
+        }
+
+        /* A sync that failed: a dot in the corner of the control */
+        .typewriter-sync__control {
+          position: relative;
+        }
+
+        typewriter-sync:state(failed) .typewriter-sync__control::after {
+          position: absolute;
+          inset: var(--app-space-xs) var(--app-space-xs) auto auto;
+          width: var(--app-space-xs);
+          height: var(--app-space-xs);
+          border-radius: 50%;
+          background: currentColor;
+          content: "";
+        }
+
         /* Above the shortcuts */
         .app-toolbar {
           z-index: var(--typewriter-z-controls);
@@ -269,6 +305,7 @@
         .app-footer > *,
         typewriter-shortcuts,
         typewriter-documents,
+        typewriter-sync,
         typewriter-export,
         typewriter-theme-toggle {
           transition:
@@ -280,6 +317,7 @@
           .app-footer > *,
           typewriter-shortcuts,
           typewriter-documents,
+          typewriter-sync,
           typewriter-export,
           typewriter-theme-toggle {
             opacity: 0;
@@ -585,6 +623,41 @@
             this.#write(true);
           }
 
+          /**
+           * Texts from another device, by id, a removed one as null: written
+           * to localStorage and followed as another tab's are. `seen` is the
+           * updatedAt the text had here when the change was made, undefined
+           * for none or a blank one: a text changed here since is kept.
+           * Returns the ids taken.
+           */
+          receive(changes) {
+            const state = this.get();
+            const texts = new Map(state.texts);
+            const taken = new Set();
+            for (const { id, text, seen } of changes) {
+              const local = texts.get(id);
+              const updatedAt =
+                local && !isBlank(local.text) ? local.updatedAt : undefined;
+              if (updatedAt !== seen) continue;
+              const key = TEXT_KEY_PREFIX + id;
+              try {
+                if (text) localStorage.setItem(key, JSON.stringify(text));
+                else localStorage.removeItem(key);
+              } catch {
+                continue;
+              }
+              if (text) texts.set(id, text);
+              else if (id === state.current) texts.set(id, createText());
+              else texts.delete(id);
+              taken.add(id);
+            }
+            if (taken.size > 0) {
+              this.#persist();
+              this.set({ ...state, texts });
+            }
+            return taken;
+          }
+
           // Another tab saved its preferences: follow them, unless this one
           // has changes of its own waiting to be saved. Each tab keeps the
           // text it has open.
@@ -763,7 +836,7 @@
           ≡
         </button>
         <div
-          class="typewriter-panel typewriter-documents__panel"
+          class="typewriter-panel typewriter-panel--toolbar"
           id="typewriter-documents-panel"
           popover
         >
@@ -771,7 +844,10 @@
             Textes
             <span class="typewriter-documents__count"></span>
           </div>
-          <button type="button" class="typewriter-documents__new">
+          <button
+            type="button"
+            class="typewriter-panel__button typewriter-documents__new"
+          >
             Nouveau texte
           </button>
           <ul class="typewriter-documents__list"></ul>
@@ -795,6 +871,69 @@
           </template>
         </div>
       </typewriter-documents>
+      <typewriter-sync>
+        <button
+          class="app-control typewriter-sync__control"
+          type="button"
+          aria-label="Synchronisation"
+          title="Synchronisation"
+          popovertarget="typewriter-sync-panel"
+          data-part="control"
+        >
+          ⇅
+        </button>
+        <div
+          class="typewriter-panel typewriter-panel--toolbar"
+          id="typewriter-sync-panel"
+          popover
+        >
+          <div class="typewriter-panel__title">Synchronisation</div>
+          <p class="typewriter-sync__status" aria-hidden="true" data-part="status"></p>
+          <p class="sr-only" role="status" data-part="announce"></p>
+          <form class="typewriter-sync__part" data-part="connect">
+            <p>
+              Vos textes dans un gist secret de votre compte GitHub, sur chaque
+              appareil où vous collez le même jeton.
+            </p>
+            <label class="typewriter-sync__field">
+              Jeton GitHub
+              <input
+                class="app-field"
+                type="password"
+                name="token"
+                required
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <a
+              href="https://github.com/settings/tokens/new?scopes=gist&description=Typewriter"
+              target="_blank"
+              rel="noopener"
+              >Créer un jeton avec l’accès aux gists</a
+            >
+            <button type="submit" class="typewriter-panel__button">
+              Synchroniser
+            </button>
+          </form>
+          <div class="typewriter-sync__part" data-part="connected" hidden>
+            <button
+              type="button"
+              class="typewriter-panel__button"
+              data-action="sync"
+            >
+              Synchroniser maintenant
+            </button>
+            <button
+              type="button"
+              class="typewriter-panel__button"
+              data-action="disconnect"
+            >
+              Déconnecter cet appareil
+            </button>
+          </div>
+        </div>
+      </typewriter-sync>
       <typewriter-export>
         <a
           class="app-control"
@@ -833,6 +972,18 @@
       const SHORTCUTS_HIDE_DELAY_MS = 150;
       const SCROLL_AT_BOTTOM_THRESHOLD_PX = 10;
       const FILE_NAME_MAX_LENGTH = 60;
+      const SYNC_KEY = "typewriter-sync";
+      const SYNC_DEBOUNCE_MS = 3000;
+      const GITHUB_API = "https://api.github.com";
+      const GIST_DESCRIPTION = "Typewriter";
+      const GIST_FILE_EXTENSION = ".json";
+      const GIST_PAGE_SIZE = 100;
+      const GIST_README = {
+        "README.md": {
+          content:
+            "Les textes de Typewriter, un fichier par texte, que l’app garde en phase d’un appareil à l’autre.\n",
+        },
+      };
 
       const { lang } = document.documentElement;
       const isMac = /mac|iphone|ipad/i.test(
@@ -876,6 +1027,208 @@
         return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
           .map(n => String(n).padStart(2, "0"))
           .join("-");
+      }
+
+      /**
+       * The token, the gist that holds the texts, and `base`, the updatedAt
+       * of each text at the last sync. Null on a device not connected.
+       */
+      function loadSyncConfig() {
+        let saved = null;
+        try {
+          saved = JSON.parse(localStorage.getItem(SYNC_KEY));
+        } catch {}
+        if (typeof saved?.token !== "string") return null;
+        return {
+          token: saved.token,
+          gistId: typeof saved.gistId === "string" ? saved.gistId : null,
+          base: typeof saved.base === "object" && saved.base ? saved.base : {},
+        };
+      }
+
+      function saveSyncConfig(config) {
+        try {
+          if (config) localStorage.setItem(SYNC_KEY, JSON.stringify(config));
+          else localStorage.removeItem(SYNC_KEY);
+        } catch {}
+      }
+
+      /** A request GitHub answered with an error, by its status. */
+      class SyncError extends Error {
+        constructor(status) {
+          super(`GitHub answered ${status}`);
+          this.status = status;
+        }
+      }
+
+      async function request(url, options) {
+        // The API allows its answers to be cached for a minute.
+        const response = await fetch(url, { ...options, cache: "no-store" });
+        if (!response.ok) throw new SyncError(response.status);
+        return response;
+      }
+
+      async function github(token, path, { method = "GET", body } = {}) {
+        const headers = {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+        };
+        const response = await request(GITHUB_API + path, {
+          method,
+          headers,
+          body: body && JSON.stringify(body),
+        });
+        return response.json();
+      }
+
+      /** The gist another device made, else a new one. */
+      async function findGist(token) {
+        for (let page = 1; ; page++) {
+          const gists = await github(
+            token,
+            `/gists?per_page=${GIST_PAGE_SIZE}&page=${page}`,
+          );
+          const gist = gists.find(
+            ({ description }) => description === GIST_DESCRIPTION,
+          );
+          if (gist) return gist.id;
+          if (gists.length < GIST_PAGE_SIZE) break;
+        }
+        // A gist is never empty: the README keeps it when no text is left.
+        const body = {
+          description: GIST_DESCRIPTION,
+          public: false,
+          files: GIST_README,
+        };
+        const { id } = await github(token, "/gists", { method: "POST", body });
+        return id;
+      }
+
+      /** The texts the gist holds, by id. */
+      async function fetchGist(token, gistId) {
+        const { files } = await github(token, `/gists/${gistId}`);
+        const texts = new Map();
+        for (const [name, file] of Object.entries(files)) {
+          if (!name.endsWith(GIST_FILE_EXTENSION)) continue;
+          // A file over 1 MB comes without its content.
+          const content = file.truncated
+            ? await (await request(file.raw_url)).text()
+            : file.content;
+          let saved = null;
+          try {
+            saved = JSON.parse(content);
+          } catch {}
+          if (
+            typeof saved?.text !== "string" ||
+            !Number.isFinite(saved.updatedAt)
+          ) {
+            continue;
+          }
+          const id = name.slice(0, -GIST_FILE_EXTENSION.length);
+          texts.set(id, { text: saved.text, updatedAt: saved.updatedAt });
+        }
+        return texts;
+      }
+
+      function updateGist(token, gistId, send) {
+        const files = {};
+        for (const [id, text] of send) {
+          files[id + GIST_FILE_EXTENSION] = text && {
+            content: JSON.stringify(text),
+          };
+        }
+        return github(token, `/gists/${gistId}`, {
+          method: "PATCH",
+          body: { files },
+        });
+      }
+
+      /** The texts kept, by id: a blank one is not. */
+      function selectKeptTexts({ texts }) {
+        return new Map(
+          [...texts].filter(([, { text }]) => text.trim() !== ""),
+        );
+      }
+
+      /**
+       * What changed on each side since the last sync, whose `base` holds
+       * the updatedAt of every text then: the texts to send to the gist and
+       * to take from it, by id, a removed one as null. A text changed on
+       * both sides is kept twice, the one changed last under its id; a text
+       * removed on one side and changed on the other is kept.
+       */
+      function merge(local, remote, base) {
+        const send = new Map();
+        const take = new Map();
+        const ids = new Set([
+          ...local.keys(),
+          ...remote.keys(),
+          ...Object.keys(base),
+        ]);
+        for (const id of ids) {
+          const mine = local.get(id);
+          const theirs = remote.get(id);
+          if (mine?.updatedAt === theirs?.updatedAt) continue;
+          if (theirs?.updatedAt === base[id]) send.set(id, mine ?? null);
+          else if (mine?.updatedAt === base[id]) take.set(id, theirs ?? null);
+          else if (!theirs) send.set(id, mine);
+          else if (!mine) take.set(id, theirs);
+          else {
+            const [last, first] =
+              mine.updatedAt > theirs.updatedAt
+                ? [mine, theirs]
+                : [theirs, mine];
+            (last === mine ? send : take).set(id, last);
+            if (first.text !== last.text) {
+              const copy = `${id}-${Date.now().toString(36)}`;
+              send.set(copy, first);
+              take.set(copy, first);
+            }
+          }
+        }
+        return { send, take };
+      }
+
+      /** One round trip: the gist and this device end up with the same texts. */
+      async function syncTexts({ token, gistId, base }) {
+        const local = selectKeptTexts(store.get());
+        const known = gistId !== null;
+        gistId ??= await findGist(token);
+        let remote;
+        try {
+          remote = await fetchGist(token, gistId);
+        } catch (error) {
+          // The gist removed on GitHub: another one, as on a first sync.
+          if (error.status !== 404 || !known) throw error;
+          return syncTexts({ token, gistId: null, base: {} });
+        }
+
+        const { send, take } = merge(local, remote, base);
+        if (send.size > 0) await updateGist(token, gistId, send);
+        const changes = [...take].map(([id, text]) => ({
+          id,
+          text,
+          seen: local.get(id)?.updatedAt,
+        }));
+        const taken = store.receive(changes);
+
+        // A text changed here during the round trip is merged at the next.
+        const next = new Map(remote);
+        for (const [id, text] of send) {
+          if (text) next.set(id, text);
+          else next.delete(id);
+        }
+        const nextBase = {};
+        for (const [id, { updatedAt }] of next) nextBase[id] = updatedAt;
+        for (const id of take.keys()) {
+          if (taken.has(id)) continue;
+          if (id in base) nextBase[id] = base[id];
+          else delete nextBase[id];
+        }
+        // A device disconnected during the round trip stays so.
+        if (loadSyncConfig()?.token === token) {
+          saveSyncConfig({ token, gistId, base: nextBase });
+        }
       }
 
       class TypewriterEditorElement extends HTMLElement {
@@ -1149,6 +1502,171 @@
         }
       }
       customElements.define("typewriter-documents", TypewriterDocumentsElement);
+
+      /**
+       * Keeps the texts in a secret gist of the user's GitHub account, the
+       * same on every device given the same token: when the page shows,
+       * after a pause in the typing and when the page is hidden.
+       */
+      class TypewriterSyncElement extends HTMLElement {
+        #controller = null;
+        #internals = this.attachInternals();
+        #syncTimeout = null;
+        #syncing = false;
+        #syncAgain = false;
+
+        connectedCallback() {
+          this.#controller = new AbortController();
+          const { signal } = this.#controller;
+          const $connect = this.querySelector('[data-part="connect"]');
+
+          $connect.addEventListener(
+            "submit",
+            e => {
+              e.preventDefault();
+              const token = $connect.elements.token.value.trim();
+              saveSyncConfig({ token, gistId: null, base: {} });
+              $connect.reset();
+              this.#render();
+              this.#sync(true);
+            },
+            { signal },
+          );
+          this.addEventListener(
+            "click",
+            ({ target }) => {
+              const { action } = target.closest("[data-action]")?.dataset ?? {};
+              if (action === "sync") {
+                this.#sync(true);
+              } else if (action === "disconnect") {
+                saveSyncConfig(null);
+                this.#render();
+                this.#report("Appareil déconnecté", { announce: true });
+              }
+            },
+            { signal },
+          );
+
+          signal.addEventListener(
+            "abort",
+            store.subscribe(({ texts }, previous) => {
+              if (texts !== previous.texts) this.#schedule(SYNC_DEBOUNCE_MS);
+            }),
+          );
+          // Hidden, the page may not come back: sent now.
+          document.addEventListener(
+            "visibilitychange",
+            () => {
+              if (document.visibilityState === "hidden") this.#sync();
+              else this.#schedule(0);
+            },
+            { signal },
+          );
+          addEventListener("focus", () => this.#schedule(0), { signal });
+          addEventListener("online", () => this.#schedule(0), { signal });
+          // Another tab connected or disconnected this device.
+          addEventListener(
+            "storage",
+            ({ key, oldValue, newValue }) => {
+              if (key !== SYNC_KEY) return;
+              const tokenOf = value => {
+                try {
+                  return JSON.parse(value)?.token;
+                } catch {}
+              };
+              if (tokenOf(oldValue) === tokenOf(newValue)) return;
+              this.#render();
+              this.#schedule(0);
+            },
+            { signal },
+          );
+
+          this.#render();
+          this.#schedule(0);
+        }
+
+        disconnectedCallback() {
+          this.#controller?.abort();
+          clearTimeout(this.#syncTimeout);
+        }
+
+        #render() {
+          const connected = loadSyncConfig() !== null;
+          this.querySelector('[data-part="connect"]').hidden = connected;
+          this.querySelector('[data-part="connected"]').hidden = !connected;
+        }
+
+        /** Shown in the panel; read aloud when asked, and on a first failure. */
+        #report(message, { failed = false, announce = false } = {}) {
+          const $control = this.querySelector('[data-part="control"]');
+          const label = failed
+            ? "Synchronisation : échec"
+            : "Synchronisation";
+
+          this.querySelector('[data-part="status"]').textContent = message;
+          if (announce || (failed && !this.#internals.states.has("failed"))) {
+            this.querySelector('[data-part="announce"]').textContent = message;
+          }
+          $control.setAttribute("aria-label", label);
+          $control.title = label;
+          if (failed) this.#internals.states.add("failed");
+          else this.#internals.states.delete("failed");
+        }
+
+        #schedule(delay) {
+          if (!loadSyncConfig()) return;
+          clearTimeout(this.#syncTimeout);
+          this.#syncTimeout = setTimeout(() => this.#sync(), delay);
+        }
+
+        async #sync(manual = false) {
+          clearTimeout(this.#syncTimeout);
+          const config = loadSyncConfig();
+          if (!config) return;
+          // One round trip at a time: the next one follows.
+          if (this.#syncing) {
+            this.#syncAgain = true;
+            return;
+          }
+          this.#syncing = true;
+          this.querySelector('[data-part="status"]').textContent =
+            "Synchronisation…";
+          try {
+            await syncTexts(config);
+            const date = dateFormat.format(new Date());
+            this.#report(`Synchronisé le ${date}`, { announce: manual });
+          } catch (error) {
+            this.#fail(error, manual);
+          } finally {
+            this.#syncing = false;
+            if (this.#syncAgain) {
+              this.#syncAgain = false;
+              this.#sync();
+            }
+          }
+        }
+
+        #fail(error, manual) {
+          const options = { failed: true, announce: manual };
+          if (error.status === 401) {
+            // A token revoked or expired: another one is asked for.
+            saveSyncConfig(null);
+            this.#render();
+            this.#report("Jeton refusé : collez-en un autre", options);
+          } else if (error instanceof SyncError) {
+            this.#report(
+              `Non synchronisé : GitHub a répondu ${error.status}`,
+              options,
+            );
+          } else if (error instanceof TypeError) {
+            this.#report("Non synchronisé : hors ligne", options);
+          } else {
+            reportError(error);
+            this.#report("Non synchronisé", options);
+          }
+        }
+      }
+      customElements.define("typewriter-sync", TypewriterSyncElement);
 
       /** Downloads the text open as a .txt file, named after its title and dated. */
       class TypewriterExportElement extends HTMLElement {
